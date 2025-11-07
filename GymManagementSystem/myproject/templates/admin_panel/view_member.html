@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>View Members</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 40px;
+      }
+      h2 {
+        text-align: center;
+      }
+      table {
+        width: 90%;
+        margin: 0 auto;
+        border-collapse: collapse;
+      }
+      th,
+      td {
+        padding: 10px;
+        border: 1px solid #ddd;
+        text-align: center;
+      }
+      th {
+        background-color: #f4f4f4;
+      }
+      .delete-btn {
+        background-color: red;
+        color: white;
+        padding: 5px 10px;
+        border: none;
+        cursor: pointer;
+      }
+      .delete-btn:hover {
+        background-color: darkred;
+      }
+    </style>
+  </head>
+  <body>
+    {% include "navbar.html" %} {% block content %} {% endblock %}
+
+    <h2>View Members</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Contact</th>
+          <th>Email</th>
+          <th>Age</th>
+          <th>Gender</th>
+          <th>Plan Name</th>
+          <th>Join Date</th>
+          <th>Expiry Date</th>
+          <th>Initial Amount</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for member in members %}
+        <tr>
+          <td>{{ member.name }}</td>
+          <td>{{ member.contact }}</td>
+          <td>{{ member.email }}</td>
+          <td>{{ member.age }}</td>
+          <td>{{ member.gender }}</td>
+          <td>{{ member.plan }}</td>
+          <td>{{ member.join_date }}</td>
+          <td>{{ member.expiry_date }}</td>
+          <td>{{ member.amount }}</td>
+          <td>
+            <form method="POST" action="{% url 'delete_member' member.id %}">
+              {% csrf_token %}
+              <button class="delete-btn" type="submit">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="10">No members available</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </body>
+</html>

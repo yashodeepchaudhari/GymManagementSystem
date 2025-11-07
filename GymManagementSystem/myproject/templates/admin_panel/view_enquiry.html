@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>View Enquiry</title>
+
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 50px;
+        text-align: center;
+      }
+      table {
+        width: 80%;
+        margin: auto;
+        border-collapse: collapse;
+      }
+      th,
+      td {
+        border: 1px solid #ddd;
+        padding: 10px;
+        text-align: center;
+      }
+      th {
+        background-color: #f4f4f4;
+      }
+      button {
+        background-color: #d9534f;
+        color: white;
+        padding: 8px 12px;
+        border: none;
+        cursor: pointer;
+        border-radius: 5px;
+      }
+      button:hover {
+        background-color: #c9302c;
+      }
+    </style>
+  </head>
+  <body>
+    {% include "navbar.html" %} {% block content %} {% endblock %}
+    <h2 style="color: #007bff">View Enquiry</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Contact</th>
+          <th>Email Id</th>
+          <th>Age</th>
+          <th>Gender</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for enquiry in enquiries %}
+        <tr>
+          <td>{{ enquiry.name }}</td>
+          <td>{{ enquiry.contact }}</td>
+          <td>{{ enquiry.email }}</td>
+          <td>{{ enquiry.age }}</td>
+          <td>{{ enquiry.gender }}</td>
+          <td>
+            <form action="{% url 'delete_enquiry' enquiry.id %}" method="POST">
+              {% csrf_token %}
+              <button type="submit">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6">No enquiries found</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </body>
+</html>

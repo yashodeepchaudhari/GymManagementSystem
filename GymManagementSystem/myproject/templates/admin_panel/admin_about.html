@@ -1,0 +1,91 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Boisar GYM</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css"
+    />
+    <style>
+      .about {
+        padding: 80px 0;
+        background-color: #f8f9fa;
+      }
+      .about img {
+        border-radius: 10px;
+        width: 100%;
+      }
+      .about h3 {
+        font-weight: bold;
+        color: #333;
+      }
+      .about ul li {
+        list-style: none;
+        margin: 10px 0;
+        font-size: 18px;
+      }
+      .about ul li i {
+        color: #28a745;
+        margin-right: 10px;
+      }
+    </style>
+  </head>
+  <body class="bg-dark text-black">
+    {% include "navbar.html" %} {% block content %} {% endblock %}
+
+    <!-- About Section -->
+    <section id="about" class="about">
+      <div class="container" data-aos="fade-up" data-aos-delay="100">
+        <div class="row align-items-center">
+          <div class="col-lg-6" data-aos="fade-right">
+            <img
+              src="{% static 'assets/img/about2.jpg' %}"
+              class="img-fluid"
+              alt="Boisar GYM"
+            />
+          </div>
+          <div class="col-lg-6" data-aos="fade-left">
+            <h3>Transform Your Fitness Journey</h3>
+            <p class="fst-italic">
+              Welcome to Boisar GYM, where we push boundaries, achieve personal
+              bests, and transform lives through fitness.
+            </p>
+            <ul>
+              <li>
+                <i class="bi bi-check2-all"></i> State-of-the-art facilities and
+                expert trainers.
+              </li>
+              <li>
+                <i class="bi bi-check2-all"></i> Tailored programs for all
+                fitness levels.
+              </li>
+              <li>
+                <i class="bi bi-check2-all"></i> A supportive and motivating
+                community.
+              </li>
+            </ul>
+            <p>
+              At Boisar GYM, it's more than just a workout—it's a lifestyle.
+              Whether you're looking to lose weight, build strength, or just
+              live a healthier life, we provide everything you need to succeed.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+    <!-- /About Section -->
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js"></script>
+
+    <script>
+      AOS.init();
+    </script>
+  </body>
+</html>
