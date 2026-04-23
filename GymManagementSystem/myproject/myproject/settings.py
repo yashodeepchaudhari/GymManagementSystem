@@ -122,6 +122,13 @@ MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/media/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 
 
+
+CSRF_TRUSTED_ORIGINGS = [
+	"http://15.206.122.68:8000",
+	]
+
+
+
 # =========================
 # LOGGING (SEE ERRORS)
 # =========================
