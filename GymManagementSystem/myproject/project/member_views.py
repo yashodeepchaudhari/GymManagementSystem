@@ -18,36 +18,52 @@ def _is_member(user):
     return user.is_authenticated and getattr(user, 'role', '') == User.Role.MEMBER
 
 
+def _redirect_if_authenticated_member(request):
+    """If a member is already logged in, send them to the dashboard.
+    If a non-member is logged in (e.g. admin), log them out so they can sign in here."""
+    if request.user.is_authenticated:
+        if _is_member(request.user):
+            return redirect('member_dashboard')
+        logout(request)
+    return None
+
+
 # =========================
 # FORMS
 # =========================
 class MemberSignupForm(_BootstrapMixin, forms.Form):
-    username = forms.CharField(max_length=150)
+    username = forms.CharField(
+        max_length=150,
+        help_text="3-150 characters. Used to log in.",
+    )
     email = forms.EmailField()
-    password = forms.CharField(widget=forms.PasswordInput, min_length=6)
+    password = forms.CharField(
+        widget=forms.PasswordInput, min_length=6,
+        help_text="At least 6 characters.",
+    )
 
-    name = forms.CharField(max_length=100)
-    contact = forms.CharField(max_length=15)
+    name = forms.CharField(max_length=100, label="Full Name")
+    contact = forms.CharField(max_length=15, label="Phone Number")
     age = forms.IntegerField(min_value=10, max_value=100)
     gender = forms.ChoiceField(choices=Member.GENDER_CHOICES)
-    plan = forms.ModelChoiceField(queryset=Plan.objects.all(), empty_label="Choose a plan")
+    plan = forms.ModelChoiceField(queryset=Plan.objects.all(), empty_label="-- Choose a plan --")
 
-    height_cm = forms.IntegerField(required=False, min_value=80, max_value=250)
-    weight_kg = forms.IntegerField(required=False, min_value=20, max_value=300)
-    goal = forms.ChoiceField(required=False, choices=[('', '—')] + Member.GOAL_CHOICES)
-    experience = forms.ChoiceField(required=False, choices=[('', '—')] + Member.EXPERIENCE_CHOICES)
-    diet = forms.ChoiceField(required=False, choices=[('', '—')] + Member.DIET_CHOICES)
+    height_cm = forms.IntegerField(required=False, min_value=80, max_value=250, label="Height (cm)")
+    weight_kg = forms.IntegerField(required=False, min_value=20, max_value=300, label="Weight (kg)")
+    goal = forms.ChoiceField(required=False, choices=[('', '— Select —')] + Member.GOAL_CHOICES)
+    experience = forms.ChoiceField(required=False, choices=[('', '— Select —')] + Member.EXPERIENCE_CHOICES)
+    diet = forms.ChoiceField(required=False, choices=[('', '— Select —')] + Member.DIET_CHOICES)
 
     def clean_username(self):
-        u = self.cleaned_data['username']
-        if User.objects.filter(username=u).exists():
-            raise forms.ValidationError("Username already taken.")
+        u = self.cleaned_data['username'].strip()
+        if User.objects.filter(username__iexact=u).exists():
+            raise forms.ValidationError("That username is already taken. Try another.")
         return u
 
     def clean_email(self):
-        e = self.cleaned_data['email']
-        if User.objects.filter(email=e).exists() or Member.objects.filter(email=e).exists():
-            raise forms.ValidationError("Email already in use.")
+        e = self.cleaned_data['email'].strip().lower()
+        if User.objects.filter(email__iexact=e).exists() or Member.objects.filter(email__iexact=e).exists():
+            raise forms.ValidationError("This email is already registered. Try logging in instead.")
         return e
 
 
@@ -55,12 +71,24 @@ class MemberProfileForm(_BootstrapMixin, forms.ModelForm):
     class Meta:
         model = Member
         fields = ['contact', 'height_cm', 'weight_kg', 'goal', 'experience', 'diet']
+        labels = {
+            'contact': 'Phone Number',
+            'height_cm': 'Height (cm)',
+            'weight_kg': 'Weight (kg)',
+        }
 
 
 # =========================
 # AUTH
 # =========================
 def member_signup(request):
+    redir = _redirect_if_authenticated_member(request)
+    if redir:
+        return redir
+
+    if not Plan.objects.exists():
+        messages.warning(request, "No membership plans available right now. Please contact the gym.")
+
     if request.method == 'POST':
         form = MemberSignupForm(request.POST)
         if form.is_valid():
@@ -95,26 +123,55 @@ def member_signup(request):
                 amount=cd['plan'].amount, mode='cash', status='paid',
             )
             login(request, user)
-            messages.success(request, "Welcome! Your membership is active.")
+            messages.success(
+                request,
+                f"Welcome, {member.name}! Your {cd['plan'].name} plan is active until {member.expiry_date:%d %b %Y}."
+            )
             return redirect('member_dashboard')
+        else:
+            messages.error(request, "Please fix the errors below and try again.")
     else:
         form = MemberSignupForm()
     return render(request, 'portal/signup.html', {'form': form})
 
 
 def member_login(request):
+    redir = _redirect_if_authenticated_member(request)
+    if redir:
+        return redir
+
     if request.method == 'POST':
-        username = request.POST.get('username')
-        password = request.POST.get('password')
-        user = authenticate(request, username=username, password=password)
-        if user is not None and getattr(user, 'role', '') == User.Role.MEMBER:
+        identifier = (request.POST.get('username') or '').strip()
+        password = request.POST.get('password') or ''
+
+        # Allow login by either username or email
+        user = authenticate(request, username=identifier, password=password)
+        if user is None and '@' in identifier:
+            try:
+                u = User.objects.get(email__iexact=identifier)
+                user = authenticate(request, username=u.username, password=password)
+            except User.DoesNotExist:
+                user = None
+
+        if user is None:
+            messages.error(request, "Username/email or password is incorrect.")
+        elif getattr(user, 'role', '') != User.Role.MEMBER:
+            messages.error(
+                request,
+                "This account is not a member account. Use the Admin Login if you're an administrator."
+            )
+        else:
             login(request, user)
+            member_name = getattr(getattr(user, 'member_profile', None), 'name', user.username)
+            messages.success(request, f"Welcome back, {member_name}!")
             return redirect('member_dashboard')
-        messages.error(request, "Invalid credentials.")
+
     return render(request, 'portal/login.html')
 
 
 def member_logout(request):
+    if request.user.is_authenticated:
+        messages.info(request, "You have been logged out.")
     logout(request)
     return redirect('member_login')
 
@@ -125,21 +182,29 @@ def member_logout(request):
 @login_required(login_url='member_login')
 def member_dashboard(request):
     if not _is_member(request.user):
+        logout(request)
         return redirect('member_login')
 
     member = getattr(request.user, 'member_profile', None)
     if not member:
-        messages.error(request, "No member profile linked to this account. Contact admin.")
+        messages.error(request, "No member profile linked to this account. Please contact admin.")
+        logout(request)
         return redirect('member_login')
 
     month_start = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    workout_plan = member.workout_plans.first()
+    diet_plan = member.diet_plans.first()
     context = {
         'member': member,
         'attendance_this_month': member.attendance.filter(check_in__gte=month_start).count(),
         'attendance_recent': member.attendance.all()[:10],
         'payments': member.payments.all()[:5],
-        'workout_plan': member.workout_plans.first(),
-        'diet_plan': member.diet_plans.first(),
+        'workout_plan': workout_plan,
+        'diet_plan': diet_plan,
+        'workout_summary': (workout_plan.content.get('summary') if workout_plan and workout_plan.content else ''),
+        'workout_first_day': (workout_plan.content.get('workout', [None])[0] if workout_plan and workout_plan.content else None),
+        'diet_first_day': (diet_plan.content.get('diet', [None])[0] if diet_plan and diet_plan.content else None),
+        'expiring_soon': member.is_active and member.days_remaining <= 7,
     }
     return render(request, 'portal/dashboard.html', context)
 
@@ -160,6 +225,43 @@ def member_profile(request):
     return render(request, 'portal/profile.html', {'form': form, 'member': member})
 
 
+# =========================
+# RENEWAL
+# =========================
+@login_required(login_url='member_login')
+def member_renew(request):
+    if not _is_member(request.user):
+        return redirect('member_login')
+    member = get_object_or_404(Member, user=request.user)
+    plans = Plan.objects.all()
+
+    if request.method == 'POST':
+        plan_id = request.POST.get('plan_id')
+        plan = get_object_or_404(Plan, id=plan_id)
+        today = timezone.now().date()
+        # New cycle starts today (or after current expiry if still active)
+        start = max(today, member.expiry_date or today)
+        sub = Subscription.objects.create(member=member, plan=plan, start_date=start)
+        Payment.objects.create(
+            subscription=sub, member=member,
+            amount=plan.amount, mode='cash', status='paid',
+        )
+        member.plan = plan
+        member.expiry_date = sub.end_date
+        member.amount = int(plan.amount)
+        member.save()
+        messages.success(
+            request,
+            f"Renewed! New expiry: {member.expiry_date:%d %b %Y}."
+        )
+        return redirect('member_dashboard')
+
+    return render(request, 'portal/renew.html', {'member': member, 'plans': plans})
+
+
+# =========================
+# AI
+# =========================
 @login_required(login_url='member_login')
 def ai_generate_plan(request):
     if not _is_member(request.user):
@@ -180,7 +282,11 @@ def ai_generate_plan(request):
         WorkoutPlan.objects.create(
             member=member,
             goal=member.goal,
-            content={"workout": parsed.get('workout', []), "summary": parsed.get('summary', ''), "tips": parsed.get('tips', [])},
+            content={
+                "workout": parsed.get('workout', []),
+                "summary": parsed.get('summary', ''),
+                "tips": parsed.get('tips', []),
+            },
             raw_text=raw,
         )
         DietPlan.objects.create(
@@ -190,7 +296,7 @@ def ai_generate_plan(request):
             content={"diet": parsed.get('diet', [])},
             raw_text=raw,
         )
-        messages.success(request, "AI plan generated!")
+        messages.success(request, "AI plan generated! Scroll down to see it.")
         return redirect('ai_view_plan')
 
     return render(request, 'portal/ai_generate.html', {'member': member})
@@ -216,10 +322,14 @@ def member_check_in(request):
     if not _is_member(request.user):
         return redirect('member_login')
     member = get_object_or_404(Member, user=request.user)
+    if not member.is_active:
+        messages.error(request, "Your membership has expired. Please renew before checking in.")
+        return redirect('member_renew')
+
     today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
     if member.attendance.filter(check_in__gte=today_start).exists():
-        messages.info(request, "Already checked in today.")
+        messages.info(request, "You've already checked in today.")
     else:
         Attendance.objects.create(member=member)
-        messages.success(request, "Checked in. Have a great workout!")
+        messages.success(request, "Checked in. Have a great workout! 💪")
     return redirect('member_dashboard')

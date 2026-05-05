@@ -48,6 +48,7 @@ urlpatterns = [
     path('portal/logout/', mv.member_logout, name='member_logout'),
     path('portal/dashboard/', mv.member_dashboard, name='member_dashboard'),
     path('portal/profile/', mv.member_profile, name='member_profile'),
+    path('portal/renew/', mv.member_renew, name='member_renew'),
     path('portal/check-in/', mv.member_check_in, name='member_check_in'),
     path('portal/ai/generate/', mv.ai_generate_plan, name='ai_generate_plan'),
     path('portal/ai/plan/', mv.ai_view_plan, name='ai_view_plan'),

@@ -157,6 +157,16 @@ LOGIN_URL = 'admin_login'
 LOGIN_REDIRECT_URL = 'admin_dashboard'
 LOGOUT_REDIRECT_URL = 'admin_login'
 
+# Map Django's "error" message tag to Bootstrap's "danger" class
+from django.contrib.messages import constants as message_constants  # noqa: E402
+MESSAGE_TAGS = {
+    message_constants.DEBUG: 'secondary',
+    message_constants.INFO: 'info',
+    message_constants.SUCCESS: 'success',
+    message_constants.WARNING: 'warning',
+    message_constants.ERROR: 'danger',
+}
+
 # =========================
 # AI
 # =========================

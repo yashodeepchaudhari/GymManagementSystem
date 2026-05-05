@@ -2,37 +2,56 @@
 {% block title %}Dashboard{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
   <div>
     <h3 class="mb-0">Hi, {{ member.name }} 👋</h3>
-    <small class="text-muted">{{ member.plan.name }} · joined {{ member.join_date }}</small>
+    <small class="text-muted">{{ member.plan.name }} · joined {{ member.join_date|date:"d M Y" }}</small>
   </div>
-  <form method="POST" action="{% url 'member_check_in' %}">
-    {% csrf_token %}
-    <button class="btn btn-success"><i class="bi bi-door-open"></i> Check In</button>
-  </form>
+  <div class="d-flex gap-2 mt-2 mt-md-0">
+    {% if member.is_active %}
+      <form method="POST" action="{% url 'member_check_in' %}" style="display:inline">
+        {% csrf_token %}
+        <button class="btn btn-success"><i class="bi bi-door-open"></i> Check In</button>
+      </form>
+    {% endif %}
+    <a class="btn btn-outline-secondary" href="{% url 'member_profile' %}"><i class="bi bi-person-gear"></i> Profile</a>
+  </div>
 </div>
 
+{# ---- Status banners ---- #}
+{% if not member.is_active %}
+  <div class="alert alert-danger d-flex justify-content-between align-items-center">
+    <div><i class="bi bi-exclamation-triangle"></i> Your membership expired on <strong>{{ member.expiry_date|date:"d M Y" }}</strong>. Renew to continue using the gym.</div>
+    <a class="btn btn-danger btn-sm" href="{% url 'member_renew' %}">Renew Now</a>
+  </div>
+{% elif expiring_soon %}
+  <div class="alert alert-warning d-flex justify-content-between align-items-center">
+    <div><i class="bi bi-clock"></i> Your plan expires in <strong>{{ member.days_remaining }} day{{ member.days_remaining|pluralize }}</strong>.</div>
+    <a class="btn btn-warning btn-sm" href="{% url 'member_renew' %}">Renew Early</a>
+  </div>
+{% endif %}
+
+{# ---- Stat cards ---- #}
 <div class="row g-3 mb-4">
   <div class="col-md-3">
     <div class="card card-stat p-3">
-      <div class="stat-label">Membership</div>
+      <div class="stat-label">MEMBERSHIP</div>
       {% if member.is_active %}
-        <div><span class="pill-active">Active</span></div>
+        <div class="mt-1"><span class="pill-active">Active</span></div>
       {% else %}
-        <div><span class="pill-expired">Expired</span></div>
+        <div class="mt-1"><span class="pill-expired">Expired</span></div>
       {% endif %}
     </div>
   </div>
   <div class="col-md-3">
     <div class="card card-stat p-3">
-      <div class="stat-label">Days Remaining</div>
+      <div class="stat-label">DAYS REMAINING</div>
       <div class="stat-num">{{ member.days_remaining }}</div>
     </div>
   </div>
   <div class="col-md-3">
     <div class="card card-stat p-3">
-      <div class="stat-label">Visits This Month</div>
+      <div class="stat-label">VISITS THIS MONTH</div>
       <div class="stat-num">{{ attendance_this_month }}</div>
     </div>
   </div>
@@ -44,62 +63,100 @@
   </div>
 </div>
 
+{# ---- AI plans (split clean cards, human-readable preview) ---- #}
 <div class="row g-3">
   <div class="col-md-6">
-    <div class="card main-card p-3">
-      <h5>AI Workout Plan</h5>
+    <div class="card main-card p-3 h-100">
+      <div class="d-flex justify-content-between align-items-start mb-2">
+        <h5 class="mb-0"><i class="bi bi-activity text-primary"></i> AI Workout Plan</h5>
+        {% if workout_plan %}
+          <small class="text-muted">{{ workout_plan.created_at|date:"d M Y" }}</small>
+        {% endif %}
+      </div>
+
       {% if workout_plan %}
-        <small class="text-muted">Generated {{ workout_plan.created_at|date:"d M Y" }}</small>
-        <pre class="mt-2 small" style="white-space: pre-wrap;">{{ workout_plan.raw_text|truncatechars:600 }}</pre>
-        <a class="btn btn-sm btn-outline-primary mt-2" href="#">View Full Plan</a>
+        {% if workout_summary %}<p class="text-muted small">{{ workout_summary }}</p>{% endif %}
+        {% if workout_first_day %}
+          <p class="mb-1"><strong>Day 1 – {{ workout_first_day.day }} ({{ workout_first_day.focus }})</strong></p>
+          <ul class="small mb-2">
+            {% for ex in workout_first_day.exercises|slice:":3" %}
+              <li>{{ ex.name }} — {{ ex.sets }} × {{ ex.reps }}</li>
+            {% empty %}
+              <li class="text-muted">Rest day</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+        <a class="btn btn-sm btn-outline-primary" href="{% url 'ai_view_plan' %}">View Full 7-Day Plan</a>
       {% else %}
-        <p class="text-muted">No plan yet. Generate one tailored to your goal.</p>
+        <div class="text-center py-3">
+          <i class="bi bi-magic" style="font-size: 2rem; color: #aaa;"></i>
+          <p class="text-muted small mb-2">No plan yet. Generate one tailored to your goal.</p>
+          <a class="btn btn-primary" href="{% url 'ai_generate_plan' %}"><i class="bi bi-magic"></i> Generate AI Plan</a>
+        </div>
       {% endif %}
-      <a class="btn btn-primary mt-2" href="{% url 'ai_generate_plan' %}"><i class="bi bi-magic"></i> Generate AI Plan</a>
     </div>
   </div>
 
   <div class="col-md-6">
-    <div class="card main-card p-3">
-      <h5>AI Diet Plan</h5>
-      {% if diet_plan %}
-        <small class="text-muted">Generated {{ diet_plan.created_at|date:"d M Y" }}</small>
-        <pre class="mt-2 small" style="white-space: pre-wrap;">{{ diet_plan.raw_text|truncatechars:600 }}</pre>
+    <div class="card main-card p-3 h-100">
+      <div class="d-flex justify-content-between align-items-start mb-2">
+        <h5 class="mb-0"><i class="bi bi-egg-fried text-success"></i> AI Diet Plan</h5>
+        {% if diet_plan %}
+          <small class="text-muted">{{ diet_plan.created_at|date:"d M Y" }}</small>
+        {% endif %}
+      </div>
+
+      {% if diet_first_day %}
+        <p class="mb-1"><strong>Day 1 – {{ diet_first_day.day }}</strong>
+          {% if diet_first_day.calories_approx %}<span class="text-muted small">~{{ diet_first_day.calories_approx }} kcal</span>{% endif %}
+        </p>
+        <ul class="small mb-2">
+          <li><strong>Breakfast:</strong> {{ diet_first_day.meals.breakfast }}</li>
+          <li><strong>Lunch:</strong> {{ diet_first_day.meals.lunch }}</li>
+          <li><strong>Dinner:</strong> {{ diet_first_day.meals.dinner }}</li>
+        </ul>
+        <a class="btn btn-sm btn-outline-success" href="{% url 'ai_view_plan' %}">View Full 7-Day Plan</a>
       {% else %}
-        <p class="text-muted">Generate a plan to see your diet recommendations.</p>
+        <div class="text-center py-3 text-muted small">
+          Generate a workout plan first — the diet plan is created together.
+        </div>
       {% endif %}
     </div>
   </div>
 
   <div class="col-md-6">
-    <div class="card main-card p-3">
-      <h5>Recent Attendance</h5>
+    <div class="card main-card p-3 h-100">
+      <h5 class="mb-3"><i class="bi bi-clock-history"></i> Recent Attendance</h5>
       {% if attendance_recent %}
         <ul class="list-unstyled mb-0">
           {% for a in attendance_recent %}
-          <li class="border-bottom py-1"><i class="bi bi-clock"></i> {{ a.check_in|date:"d M Y, H:i" }}</li>
+            <li class="border-bottom py-1 small"><i class="bi bi-check-circle text-success"></i> {{ a.check_in|date:"d M Y, H:i" }}</li>
           {% endfor %}
         </ul>
       {% else %}
-        <p class="text-muted">No check-ins yet.</p>
+        <p class="text-muted">No check-ins yet. Press <strong>Check In</strong> when you arrive.</p>
       {% endif %}
     </div>
   </div>
 
   <div class="col-md-6">
-    <div class="card main-card p-3">
-      <h5>Payments</h5>
+    <div class="card main-card p-3 h-100">
+      <h5 class="mb-3"><i class="bi bi-receipt"></i> Payments</h5>
       {% if payments %}
-        <table class="table table-sm">
+        <table class="table table-sm mb-0">
           <thead><tr><th>Date</th><th>Amount</th><th>Mode</th><th>Status</th></tr></thead>
           <tbody>
             {% for p in payments %}
-            <tr>
-              <td>{{ p.paid_at|date:"d M Y" }}</td>
-              <td>₹{{ p.amount }}</td>
-              <td>{{ p.get_mode_display }}</td>
-              <td>{{ p.get_status_display }}</td>
-            </tr>
+              <tr>
+                <td>{{ p.paid_at|date:"d M Y" }}</td>
+                <td>₹{{ p.amount }}</td>
+                <td>{{ p.get_mode_display }}</td>
+                <td>
+                  {% if p.status == 'paid' %}<span class="pill-active">Paid</span>
+                  {% else %}<span class="pill-expired">{{ p.get_status_display }}</span>
+                  {% endif %}
+                </td>
+              </tr>
             {% endfor %}
           </tbody>
         </table>
