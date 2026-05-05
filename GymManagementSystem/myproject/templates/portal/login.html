@@ -1,0 +1,25 @@
+{% extends 'portal/base.html' %}
+{% block title %}Log In{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-5">
+    <div class="card main-card p-4">
+      <h3 class="mb-3 text-center">Member Login</h3>
+      <form method="POST">
+        {% csrf_token %}
+        <div class="mb-3">
+          <label class="form-label">Username</label>
+          <input class="form-control" name="username" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Password</label>
+          <input type="password" class="form-control" name="password" required>
+        </div>
+        <button class="btn btn-primary w-100">Log In</button>
+        <p class="text-center mt-3 mb-0">No account? <a href="{% url 'member_signup' %}">Sign up</a></p>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

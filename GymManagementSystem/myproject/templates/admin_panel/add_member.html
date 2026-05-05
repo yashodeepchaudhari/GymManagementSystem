@@ -3,102 +3,54 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Add Member</title>
-
-    <style>
-      body {
-        font-family: Arial, sans-serif;
-        margin: 50px;
-        text-align: center;
-      }
-      form {
-        display: inline-block;
-        text-align: left;
-        background: #f8f9fa;
-        padding: 20px;
-        border-radius: 8px;
-        box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
-        width: 400px;
-      }
-      label {
-        font-weight: bold;
-      }
-      input,
-      select {
-        display: block;
-        width: 100%;
-        margin-bottom: 15px;
-        padding: 8px;
-        border: 1px solid #ccc;
-        border-radius: 5px;
-      }
-      .gender {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        margin-bottom: 15px;
-      }
-      .gender input {
-        width: auto;
-      }
-      button {
-        background-color: #d9534f;
-        color: white;
-        padding: 10px 15px;
-        border: none;
-        cursor: pointer;
-        border-radius: 5px;
-        width: 100%;
-      }
-      button:hover {
-        background-color: #c9302c;
-      }
-    </style>
+    <title>{% if editing %}Edit{% else %}Add{% endif %} Member</title>
   </head>
   <body>
-    {% include "admin_panel/navbar.html" %} {% block content %} {% endblock %}
+    {% include "admin_panel/navbar.html" %}
 
-    <h2 style="color: #007bff">Add Member</h2>
+    <div class="panel panel-narrow">
+      <h2 class="text-center">{% if editing %}Edit{% else %}Add{% endif %} Member</h2>
 
-    <form method="POST" action="{% url 'add_member' %}">
-      {% csrf_token %}
+      {% if messages %}
+        {% for message in messages %}<div class="alert alert-info">{{ message }}</div>{% endfor %}
+      {% endif %}
 
-      <label for="name">Name</label>
-      <input type="text" id="name" name="name" required />
+      <form method="POST">
+        {% csrf_token %}
 
-      <label for="contact">Contact</label>
-      <input type="text" id="contact" name="contact" required />
+        <div class="row">
+          <div class="col-md-6 mb-3"><label class="form-label">Name</label>{{ form.name }}</div>
+          <div class="col-md-6 mb-3"><label class="form-label">Contact</label>{{ form.contact }}</div>
+        </div>
 
-      <label for="email">Email Id</label>
-      <input type="email" id="email" name="email" required />
+        <div class="row">
+          <div class="col-md-6 mb-3"><label class="form-label">Email</label>{{ form.email }}</div>
+          <div class="col-md-3 mb-3"><label class="form-label">Age</label>{{ form.age }}</div>
+          <div class="col-md-3 mb-3"><label class="form-label">Gender</label>{{ form.gender }}</div>
+        </div>
 
-      <label for="age">Age</label>
-      <input type="number" id="age" name="age" required />
+        <div class="row">
+          <div class="col-md-6 mb-3"><label class="form-label">Plan</label>{{ form.plan }}</div>
+          <div class="col-md-3 mb-3"><label class="form-label">Join Date</label>{{ form.join_date }}</div>
+          <div class="col-md-3 mb-3"><label class="form-label">Amount</label>{{ form.amount }}</div>
+        </div>
 
-      <label>Gender</label>
-      <div class="gender">
-        <input type="radio" id="male" name="gender" value="Male" required />
-        <label for="male">Male</label>
-        <input type="radio" id="female" name="gender" value="Female" />
-        <label for="female">Female</label>
-      </div>
+        <h6 class="mt-2 text-muted">Profile <small>(optional — used for AI workout/diet plan)</small></h6>
+        <div class="row">
+          <div class="col-md-3 mb-3"><label class="form-label">Height (cm)</label>{{ form.height_cm }}</div>
+          <div class="col-md-3 mb-3"><label class="form-label">Weight (kg)</label>{{ form.weight_kg }}</div>
+          <div class="col-md-2 mb-3"><label class="form-label">Goal</label>{{ form.goal }}</div>
+          <div class="col-md-2 mb-3"><label class="form-label">Experience</label>{{ form.experience }}</div>
+          <div class="col-md-2 mb-3"><label class="form-label">Diet</label>{{ form.diet }}</div>
+        </div>
 
-      <label for="plan">Plan Name</label>
-      <select id="plan" name="plan">
-        <option value="Yearly Plans">Yearly Plans</option>
-        <option value="Monthly Plans">Monthly Plans</option>
-      </select>
+        <p class="small text-muted">Expiry date is computed automatically from the plan duration.</p>
 
-      <label for="join_date">Join Date</label>
-      <input type="date" id="join_date" name="join_date" required />
-
-      <label for="expiry_date">Expiry Date</label>
-      <input type="date" id="expiry_date" name="expiry_date" required />
-
-      <label for="amount">Initial Amount</label>
-      <input type="number" id="amount" name="amount" required />
-
-      <button type="submit">Submit</button>
-    </form>
+        <button type="submit" class="btn btn-primary w-100">
+          {% if editing %}Update Member{% else %}Save Member{% endif %}
+        </button>
+        <a class="btn btn-link w-100 mt-2" href="{% url 'view_member' %}">Cancel</a>
+      </form>
+    </div>
   </body>
 </html>

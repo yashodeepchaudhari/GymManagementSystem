@@ -4,75 +4,48 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>View Equipment</title>
-    <style>
-      body {
-        font-family: Arial, sans-serif;
-        margin: 40px;
-      }
-      h2 {
-        text-align: center;
-      }
-      table {
-        width: 80%;
-        margin: 0 auto;
-        border-collapse: collapse;
-      }
-      th,
-      td {
-        padding: 10px;
-        border: 1px solid #ddd;
-        text-align: center;
-      }
-      th {
-        background-color: #f4f4f4;
-      }
-      .delete-btn {
-        background-color: red;
-        color: white;
-        padding: 5px 10px;
-        border: none;
-        cursor: pointer;
-      }
-      .delete-btn:hover {
-        background-color: darkred;
-      }
-    </style>
   </head>
   <body>
-    {% include "admin_panel/navbar.html" %} {% block content %} {% endblock %}
+    {% include "admin_panel/navbar.html" %}
 
-    <h2>View Equipment</h2>
-    <table>
-      <tr>
-        <th>Name</th>
-        <th>Price</th>
-        <th>Unit</th>
-        <th>Date</th>
-        <th>Description</th>
-        <th>Action</th>
-      </tr>
-      {% for equipment in equipment_list %}
-      <tr>
-        <td>{{ equipment.name }}</td>
-        <td>{{ equipment.price }}</td>
-        <td>{{ equipment.unit }}</td>
-        <td>{{ equipment.date }}</td>
-        <td>{{ equipment.description }}</td>
-        <td>
-          <form
-            action="{% url 'delete_equipment' equipment.id %}"
-            method="POST"
-          >
-            {% csrf_token %}
-            <button class="delete-btn" type="submit">Delete</button>
-          </form>
-        </td>
-      </tr>
-      {% empty %}
-      <tr>
-        <td colspan="4">No equipment available</td>
-      </tr>
-      {% endfor %}
-    </table>
+    <div class="panel">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="mb-0">Equipment</h2>
+        <a href="{% url 'add_equipment' %}" class="btn btn-primary btn-sm">+ Add Equipment</a>
+      </div>
+
+      {% if messages %}
+        {% for message in messages %}<div class="alert alert-info py-2">{{ message }}</div>{% endfor %}
+      {% endif %}
+
+      <div class="table-responsive">
+        <table class="table table-hover align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>Name</th><th>Price</th><th>Unit</th><th>Date</th><th>Description</th><th class="text-end">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for equipment in equipment_list %}
+            <tr>
+              <td>{{ equipment.name }}</td>
+              <td>₹{{ equipment.price }}</td>
+              <td>{{ equipment.unit }}</td>
+              <td>{{ equipment.date|date:"d M Y" }}</td>
+              <td>{{ equipment.description|truncatechars:60 }}</td>
+              <td class="text-end">
+                <form action="{% url 'delete_equipment' equipment.id %}" method="POST" style="display:inline" onsubmit="return confirm('Delete {{ equipment.name }}?');">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-outline-danger btn-action">Delete</button>
+                </form>
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="text-center text-muted">No equipment available.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
   </body>
 </html>
