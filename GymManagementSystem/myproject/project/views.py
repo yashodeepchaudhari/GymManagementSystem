@@ -84,9 +84,18 @@ def admin_logout(request):
 # =========================
 @login_required(login_url="admin_login")
 def admin_dashboard(request):
-    from .ml_service import predict_at_risk_members, MODEL_PATH
+    from .ml_service import predict_at_risk_members, MODEL_PATH, forecast_signups
     raw_at_risk = predict_at_risk_members(top_n=10) if MODEL_PATH.exists() else []
     at_risk = [(m, prob, int(prob * 100)) for m, prob in raw_at_risk]
+
+    fc = forecast_signups(months_ahead=3)
+    forecast_labels = [r['month'] for r in fc['history']] + [r['month'] for r in fc['forecast']]
+    forecast_history = [r['count'] for r in fc['history']] + [None] * len(fc['forecast'])
+    forecast_predicted = [None] * len(fc['history']) + [r['count'] for r in fc['forecast']]
+    # Make the boundary connect: repeat last history value at first forecast slot
+    if fc['history'] and fc['forecast']:
+        idx = len(fc['history']) - 1
+        forecast_predicted[idx] = fc['history'][-1]['count']
 
     # Last 6 months revenue for Chart.js
     today = timezone.now().date()
@@ -114,8 +123,56 @@ def admin_dashboard(request):
         'chart_labels': chart_labels,
         'chart_data': chart_data,
         'total_revenue': sum(chart_data),
+        'forecast_labels': forecast_labels,
+        'forecast_history': forecast_history,
+        'forecast_predicted': forecast_predicted,
     }
     return render(request, "admin_panel/admin_dashboard.html", context)
+
+
+@login_required(login_url="admin_login")
+def qr_scanner(request):
+    """Render the staff QR scanner page (uses webcam + jsQR)."""
+    return render(request, "admin_panel/qr_scanner.html")
+
+
+@login_required(login_url="admin_login")
+@require_POST
+def qr_check_in(request):
+    """JSON: receives a scanned QR payload, records attendance for that member."""
+    from django.http import JsonResponse
+    payload = (request.POST.get('payload') or '').strip()
+    prefix = "GYMPRO:MEMBER:"
+    if not payload.startswith(prefix):
+        return JsonResponse({'ok': False, 'error': 'Invalid QR'}, status=400)
+    try:
+        member_id = int(payload[len(prefix):])
+    except ValueError:
+        return JsonResponse({'ok': False, 'error': 'Invalid QR'}, status=400)
+
+    from .models import Member, Attendance
+    try:
+        member = Member.objects.select_related('plan').get(id=member_id)
+    except Member.DoesNotExist:
+        return JsonResponse({'ok': False, 'error': 'Member not found'}, status=404)
+
+    if not member.is_active:
+        return JsonResponse({
+            'ok': False, 'error': 'Membership expired',
+            'member': {'name': member.name, 'expiry': str(member.expiry_date)},
+        }, status=403)
+
+    today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    if member.attendance.filter(check_in__gte=today_start).exists():
+        return JsonResponse({
+            'ok': True, 'duplicate': True,
+            'member': {'name': member.name, 'plan': member.plan.name, 'days_left': member.days_remaining},
+        })
+    Attendance.objects.create(member=member)
+    return JsonResponse({
+        'ok': True,
+        'member': {'name': member.name, 'plan': member.plan.name, 'days_left': member.days_remaining},
+    })
 
 
 @login_required(login_url="admin_login")

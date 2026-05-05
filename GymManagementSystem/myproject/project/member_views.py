@@ -9,9 +9,14 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from accounts.models import User
-from .models import Member, Plan, Subscription, Payment, Attendance, WorkoutPlan, DietPlan
+from django.http import JsonResponse, HttpResponse
+from .models import (
+    Member, Plan, Subscription, Payment, Attendance,
+    WorkoutPlan, DietPlan, ChatMessage, BodyAnalysis,
+)
 from .forms import _BootstrapMixin
-from .ai_service import generate_fitness_plan
+from .ai_service import generate_fitness_plan, chat_reply, analyze_body_photo
+from .pdf_service import render_plan_pdf, render_receipt_pdf
 
 
 def _is_member(user):
@@ -313,6 +318,131 @@ def ai_view_plan(request):
         'member': member,
         'workout': workout,
         'diet': diet,
+    })
+
+
+@login_required(login_url='member_login')
+def member_qr(request):
+    """Render the member's unique QR PNG for gym entry."""
+    if not _is_member(request.user):
+        return redirect('member_login')
+    member = get_object_or_404(Member, user=request.user)
+
+    import qrcode
+    from io import BytesIO
+    payload = f"GYMPRO:MEMBER:{member.id}"
+    img = qrcode.make(payload, box_size=10, border=2)
+    buf = BytesIO()
+    img.save(buf, format='PNG')
+    return HttpResponse(buf.getvalue(), content_type='image/png')
+
+
+@login_required(login_url='member_login')
+def body_analysis(request):
+    if not _is_member(request.user):
+        return redirect('member_login')
+    member = get_object_or_404(Member, user=request.user)
+
+    if request.method == 'POST':
+        photo = request.FILES.get('photo')
+        weight = request.POST.get('weight_kg') or None
+        if not photo:
+            messages.error(request, "Please choose a photo first.")
+            return redirect('body_analysis')
+        if photo.size > 5 * 1024 * 1024:
+            messages.error(request, "Image too large (>5 MB). Try a smaller file.")
+            return redirect('body_analysis')
+
+        photo.seek(0)
+        image_bytes = photo.read()
+        photo.seek(0)
+        mime = photo.content_type or 'image/jpeg'
+
+        try:
+            text = analyze_body_photo(member, image_bytes, mime_type=mime)
+        except Exception as e:
+            messages.error(request, f"Analysis failed: {e}")
+            return redirect('body_analysis')
+
+        ba = BodyAnalysis.objects.create(
+            member=member, photo=photo, analysis=text,
+            weight_kg=int(weight) if weight else None,
+        )
+        messages.success(request, "Body analysis ready.")
+        return redirect('body_analysis')
+
+    history = member.body_analyses.all()[:10]
+    return render(request, 'portal/body_analysis.html', {
+        'member': member,
+        'history': history,
+    })
+
+
+@login_required(login_url='member_login')
+def download_plan_pdf(request):
+    if not _is_member(request.user):
+        return redirect('member_login')
+    member = get_object_or_404(Member, user=request.user)
+    workout = member.workout_plans.first()
+    diet = member.diet_plans.first()
+    if not workout:
+        messages.error(request, "Generate an AI plan first before downloading.")
+        return redirect('ai_generate_plan')
+    pdf = render_plan_pdf(member, workout, diet)
+    response = HttpResponse(pdf, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="GymPro_Plan_{member.name.replace(" ", "_")}.pdf"'
+    return response
+
+
+@login_required(login_url='member_login')
+def download_receipt_pdf(request, payment_id):
+    if not _is_member(request.user):
+        return redirect('member_login')
+    member = get_object_or_404(Member, user=request.user)
+    payment = get_object_or_404(Payment, id=payment_id, member=member)
+    pdf = render_receipt_pdf(payment)
+    response = HttpResponse(pdf, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="receipt_{payment.id}.pdf"'
+    return response
+
+
+@login_required(login_url='member_login')
+@require_POST
+def chat_send(request):
+    """JSON endpoint: takes a user message, returns assistant reply."""
+    if not _is_member(request.user):
+        return JsonResponse({'error': 'unauthorized'}, status=401)
+    member = get_object_or_404(Member, user=request.user)
+
+    user_message = (request.POST.get('message') or '').strip()
+    if not user_message:
+        return JsonResponse({'error': 'empty message'}, status=400)
+    if len(user_message) > 1000:
+        return JsonResponse({'error': 'message too long'}, status=400)
+
+    # Pass last 10 messages as context (5 exchanges)
+    recent = list(member.chat_messages.order_by('-created_at')[:10])
+    recent.reverse()
+    history = [{'role': m.role, 'content': m.content} for m in recent]
+
+    ChatMessage.objects.create(member=member, role='user', content=user_message)
+    reply = chat_reply(member, user_message, history)
+    ChatMessage.objects.create(member=member, role='assistant', content=reply)
+
+    return JsonResponse({'reply': reply})
+
+
+@login_required(login_url='member_login')
+def chat_history(request):
+    """JSON endpoint: returns last 20 messages."""
+    if not _is_member(request.user):
+        return JsonResponse({'error': 'unauthorized'}, status=401)
+    member = get_object_or_404(Member, user=request.user)
+    msgs = list(member.chat_messages.order_by('-created_at')[:20])
+    msgs.reverse()
+    return JsonResponse({
+        'messages': [{'role': m.role, 'content': m.content,
+                      'time': m.created_at.strftime('%H:%M')} for m in msgs]
     })
 
 

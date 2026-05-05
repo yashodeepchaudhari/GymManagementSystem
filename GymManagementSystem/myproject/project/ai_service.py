@@ -115,6 +115,118 @@ def _mock_plan(member) -> dict[str, Any]:
     }
 
 
+CHAT_SYSTEM_TEMPLATE = """You are FitBot, a friendly AI fitness coach for {name}.
+Their profile:
+- Age {age}, gender {gender}, BMI {bmi}, goal: {goal}
+- Experience: {experience}, diet: {diet}
+- Plan: {plan_name}, expires {expiry}
+
+Answer concisely (1-3 short paragraphs). Stay focused on fitness, nutrition,
+form, recovery, motivation. If asked something unrelated or medical, politely
+redirect or suggest seeing a professional.
+"""
+
+
+def _build_chat_system(member) -> str:
+    plan_name = member.plan.name if member.plan_id else 'no plan'
+    return CHAT_SYSTEM_TEMPLATE.format(
+        name=member.name,
+        age=member.age,
+        gender=member.gender or 'unspecified',
+        bmi=member.bmi or 'unknown',
+        goal=member.get_goal_display() or 'general fitness',
+        experience=member.get_experience_display() or 'beginner',
+        diet=member.get_diet_display() or 'no preference',
+        plan_name=plan_name,
+        expiry=member.expiry_date or 'unknown',
+    )
+
+
+VISION_PROMPT_TEMPLATE = """You are a fitness coach analysing a body photo for {name}.
+
+Member context:
+- Age {age}, gender {gender}, height {height_cm}cm, weight {weight_kg}kg, BMI {bmi}
+- Goal: {goal}, experience: {experience}
+
+Look at the photo and respond with EXACTLY 3 short sections (no markdown headers, plain text):
+
+1. POSTURE & PROPORTIONS — 2 sentences on what you observe (shoulders, hips, alignment).
+2. AREAS TO FOCUS — 2-3 bullet points (use • for bullets) on muscle groups or postural fixes.
+3. ENCOURAGEMENT — 1 motivating sentence.
+
+Be respectful, evidence-based, and avoid claiming exact body-fat percentages. If the
+photo doesn't clearly show a person, say so politely instead of guessing.
+"""
+
+
+def analyze_body_photo(member, image_bytes: bytes, mime_type: str = 'image/jpeg') -> str:
+    """Send photo + member context to Gemini Vision; return text analysis."""
+    if not settings.GEMINI_API_KEY:
+        return ("(Vision offline — set GEMINI_API_KEY to enable AI analysis.)\n\n"
+                "Posture & proportions: Looks balanced overall.\n"
+                "Areas to focus:\n• Core stability\n• Posterior chain\n• Mobility\n"
+                "Encouragement: Keep showing up — consistency wins!")
+
+    import google.generativeai as genai
+    genai.configure(api_key=settings.GEMINI_API_KEY)
+
+    model = genai.GenerativeModel('gemini-flash-latest')
+    prompt = VISION_PROMPT_TEMPLATE.format(
+        name=member.name,
+        age=member.age,
+        gender=member.gender or 'unspecified',
+        height_cm=member.height_cm or 'unknown',
+        weight_kg=member.weight_kg or 'unknown',
+        bmi=member.bmi or 'unknown',
+        goal=member.get_goal_display() or 'general fitness',
+        experience=member.get_experience_display() or 'beginner',
+    )
+    try:
+        resp = model.generate_content(
+            [prompt, {'mime_type': mime_type, 'data': image_bytes}],
+            generation_config={'temperature': 0.4},
+        )
+        return (resp.text or '').strip() or "(Vision returned empty response.)"
+    except Exception as e:
+        logger.exception("Gemini vision failed: %s", e)
+        return f"AI analysis failed: {e}"
+
+
+def chat_reply(member, user_message: str, history: list[dict]) -> str:
+    """Send a member message + recent history to Gemini, return assistant reply.
+
+    history is a list of {'role': 'user'|'assistant', 'content': str} items in order.
+    Falls back to a stub reply if no API key is configured.
+    """
+    if not settings.GEMINI_API_KEY:
+        return ("(FitBot offline — set GEMINI_API_KEY to enable AI chat.) "
+                "Quick tip: drink water, sleep well, and stay consistent!")
+
+    import google.generativeai as genai
+    genai.configure(api_key=settings.GEMINI_API_KEY)
+
+    model = genai.GenerativeModel(
+        'gemini-flash-latest',
+        system_instruction=_build_chat_system(member),
+    )
+
+    # Convert history to Gemini's format. Gemini uses 'user' and 'model'.
+    gemini_history = []
+    for msg in history:
+        gemini_history.append({
+            'role': 'user' if msg['role'] == 'user' else 'model',
+            'parts': [msg['content']],
+        })
+
+    try:
+        chat = model.start_chat(history=gemini_history)
+        resp = chat.send_message(user_message, generation_config={'temperature': 0.7})
+        return (resp.text or '').strip() or "Sorry, I couldn't generate a reply. Try rephrasing?"
+    except Exception as e:
+        logger.exception("Gemini chat failed: %s", e)
+        return f"FitBot ran into an issue: {e}. Try again in a moment."
+
+
 def generate_fitness_plan(member) -> tuple[dict[str, Any], str]:
     """
     Returns (parsed_dict, raw_text).

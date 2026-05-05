@@ -234,6 +234,72 @@ class DietPlan(models.Model):
         return f"Diet for {self.member.name} ({self.created_at:%Y-%m-%d})"
 
 
+class Trainer(models.Model):
+    SPECIALTY_CHOICES = [
+        ('strength', 'Strength & Conditioning'),
+        ('cardio', 'Cardio & HIIT'),
+        ('yoga', 'Yoga & Mobility'),
+        ('nutrition', 'Nutrition Coach'),
+        ('general', 'General Fitness'),
+    ]
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='trainer_profile',
+    )
+    name = models.CharField(max_length=100)
+    specialty = models.CharField(max_length=20, choices=SPECIALTY_CHOICES, default='general')
+    bio = models.TextField(blank=True)
+    photo = models.ImageField(upload_to='trainers/', blank=True, null=True)
+
+    def __str__(self):
+        return self.name
+
+
+class MemberTrainer(models.Model):
+    """Assigns a member to a trainer (current assignment)."""
+    member = models.OneToOneField(Member, on_delete=models.CASCADE, related_name='assignment')
+    trainer = models.ForeignKey(Trainer, on_delete=models.CASCADE, related_name='members')
+    notes = models.TextField(blank=True)
+    assigned_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.member.name} → {self.trainer.name}"
+
+
+class BodyAnalysis(models.Model):
+    """A photo + AI body composition analysis."""
+    member = models.ForeignKey(Member, on_delete=models.CASCADE, related_name='body_analyses')
+    photo = models.ImageField(upload_to='body_photos/')
+    analysis = models.TextField(blank=True)
+    weight_kg = models.PositiveIntegerField(blank=True, null=True, help_text="Optional weight when photo was taken")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name_plural = "Body analyses"
+
+    def __str__(self):
+        return f"{self.member.name} – {self.created_at:%Y-%m-%d}"
+
+
+class ChatMessage(models.Model):
+    ROLE_CHOICES = [('user', 'User'), ('assistant', 'Assistant')]
+
+    member = models.ForeignKey(Member, on_delete=models.CASCADE, related_name='chat_messages')
+    role = models.CharField(max_length=10, choices=ROLE_CHOICES)
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"[{self.role}] {self.member.name}: {self.content[:40]}"
+
+
 class Image(models.Model):
     photo = models.ImageField(upload_to="myimage")
     date = models.DateTimeField(auto_now_add=True)

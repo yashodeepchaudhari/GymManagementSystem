@@ -1,0 +1,32 @@
+{% extends 'trainer/base.html' %}
+{% block title %}Trainer Login{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-4">
+  <div class="col-md-5">
+    <div class="card main-card p-4">
+      <div class="text-center mb-3">
+        <i class="bi bi-clipboard-check" style="font-size: 3rem; color: #2c3e50;"></i>
+        <h3 class="mt-2 mb-1">Trainer Login</h3>
+        <p class="text-muted small">Access your assigned members and their AI plans</p>
+      </div>
+      <form method="POST" novalidate>
+        {% csrf_token %}
+        <div class="mb-3"><label class="form-label">Username or Email</label>
+          <input class="form-control" name="username" required autofocus></div>
+        <div class="mb-3"><label class="form-label">Password</label>
+          <input type="password" class="form-control" name="password" required></div>
+        <button class="btn btn-dark w-100">Log In</button>
+      </form>
+      <hr class="my-4">
+      <div class="text-center small">
+        <a href="{% url 'home' %}" class="text-muted"><i class="bi bi-arrow-left"></i> Back to home</a>
+        &nbsp;·&nbsp;
+        <a href="{% url 'admin_login' %}" class="text-muted">Admin login</a>
+        &nbsp;·&nbsp;
+        <a href="{% url 'member_login' %}" class="text-muted">Member login</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

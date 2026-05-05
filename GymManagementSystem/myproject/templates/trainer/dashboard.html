@@ -1,0 +1,44 @@
+{% extends 'trainer/base.html' %}
+{% block title %}Trainer Dashboard{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h3 class="mb-0">Welcome, {{ trainer.name }}</h3>
+    <small class="text-muted">{{ trainer.get_specialty_display }} · {{ assignments.count }} assigned member{{ assignments.count|pluralize }}</small>
+  </div>
+</div>
+
+<div class="card main-card p-3">
+  <h5 class="mb-3">My Members</h5>
+  {% if assignments %}
+  <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead class="table-light">
+        <tr><th>Name</th><th>Plan</th><th>Goal</th><th>BMI</th><th>Status</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for a in assignments %}
+        <tr>
+          <td><strong>{{ a.member.name }}</strong><br><small class="text-muted">{{ a.member.contact }}</small></td>
+          <td>{{ a.member.plan.name }}</td>
+          <td>{{ a.member.get_goal_display|default:"—" }}</td>
+          <td>{{ a.member.bmi|default:"—" }}</td>
+          <td>
+            {% if a.member.is_active %}
+              <span class="pill-active">{{ a.member.days_remaining }}d left</span>
+            {% else %}
+              <span class="pill-expired">Expired</span>
+            {% endif %}
+          </td>
+          <td><a class="btn btn-sm btn-outline-primary" href="{% url 'trainer_member_detail' a.member.id %}">Open</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="text-muted text-center my-4">No members assigned yet. Ask the admin to assign some.</p>
+  {% endif %}
+</div>
+{% endblock %}

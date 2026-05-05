@@ -1,141 +1,223 @@
 # GymPro — AI-Powered Gym Management System
 
-A full-stack Django application for running a gym, with **two AI integrations**:
+A full-stack Django application for running a gym end-to-end, with **three AI integrations** and **two classical-ML models**:
 
-1. **Generative AI** — Google Gemini produces personalized 7-day workout & diet plans for each member.
-2. **Classical ML** — A scikit-learn `RandomForestClassifier` predicts member-churn probability so admins can intervene before renewals are lost.
+| | What it does | Stack |
+|---|---|---|
+| 🤖 **AI #1 — Plan Generator** | Generates personalized 7-day workout + diet plans | Google Gemini (`gemini-flash-latest`) with structured JSON output |
+| 🤖 **AI #2 — Member Chatbot** | Conversational fitness coach on the member dashboard | Gemini chat API with member-aware system prompt + 10-message history |
+| 🤖 **AI #3 — Body Vision Analyzer** | Member uploads a photo → posture & focus-area analysis | Gemini Vision (multi-modal) |
+| 🧠 **ML #1 — Churn Predictor** | Ranks active members by likelihood of not renewing | scikit-learn `RandomForestClassifier` on 8 behavioral features |
+| 🧠 **ML #2 — Signup Forecaster** | Predicts next 3 months of new signups | scikit-learn `LinearRegression` with 12-month seasonality |
+
+The same Django app exposes a **JWT-secured REST API** (Swagger UI at `/api/docs/`), a **member portal**, an **admin panel**, a **trainer portal**, and a **QR-code attendance scanner**.
 
 ---
 
 ## ✨ Highlights
 
-| Area | What it does |
+| Area | Detail |
 |---|---|
-| Custom user model | `accounts.User` with `admin` / `trainer` / `member` roles |
-| Admin panel | Members, Plans, Equipment, Enquiries, Gallery — full CRUD with search & pagination |
-| Member portal | Self-service signup → choose plan → dashboard, attendance check-in, profile, AI plans |
-| AI generator (Gemini) | Structured JSON workout + diet plans, stored in `WorkoutPlan` / `DietPlan` |
-| Churn predictor (sklearn) | Trains on real attendance/payment/tenure data; ranks at-risk active members |
-| Reports | Admin dashboard with monthly revenue chart (Chart.js), CSV export, ML risk table |
-| Local-first | SQLite + local media by default; flip a flag in `.env` for MySQL/RDS + S3 |
+| Three user roles | `admin`, `trainer`, `member` — each with its own login & dashboard |
+| Custom user model | `accounts.User` extends `AbstractUser` with `role` + `phone` |
+| Member portal | Self-service signup → choose plan → dashboard, attendance, profile, AI plans, body analysis, chatbot, plan/receipt PDF download |
+| Admin panel | Members, Plans, Equipment, Enquiries, Gallery — full CRUD with search, pagination, edit, CSV export |
+| Trainer portal | Dashboard with assigned members, AI plan view, notes editor |
+| QR attendance | Member's dashboard shows their unique QR; staff `/scanner/` reads it via webcam (jsQR) |
+| REST API | DRF + SimpleJWT + drf-spectacular, role-scoped permissions |
+| Reports | Admin dashboard: monthly revenue chart, ML at-risk members, signup forecast |
+| Tests | 32 pytest-django tests covering models, views, AI service, ML labelling |
+| PDF | Multi-page AI plan PDF, single-page payment receipt PDF (reportlab) |
+| Local-first | SQLite + local media by default; flip env flags for MySQL/RDS + S3 |
 
 ---
 
 ## 🧱 Tech Stack
 
 - **Django 5.1** with custom user model
+- **Django REST Framework** + `djangorestframework-simplejwt` + `drf-spectacular`
 - **SQLite** for local dev (MySQL-ready via `USE_MYSQL=True`)
-- **Bootstrap 5** + Chart.js for UI
-- **google-generativeai** SDK for Gemini API
-- **scikit-learn** for churn prediction
+- **Bootstrap 5** + **Chart.js** + **Bootstrap Icons** for UI
+- **google-generativeai** for the three AI surfaces
+- **scikit-learn** + **pandas** + **joblib** for the two ML models
+- **reportlab** for PDF generation
+- **qrcode** + **jsQR** (browser) for QR attendance
+- **pytest-django** for testing
 - **python-decouple** for `.env` config
 
-Optional production extras: AWS S3 (`django-storages`), `gunicorn`, `mysqlclient`.
+Optional extras (gated behind env flags): AWS S3 (`django-storages`), `mysqlclient`, `gunicorn`.
 
 ---
 
 ## 🚀 Setup (Local)
 
 ```powershell
-# 1. Create venv and activate
+# 1. Create virtual env and activate
 py -m venv venv
 venv\Scripts\activate
 
-# 2. Install
+# 2. Install dependencies
 pip install -r requirements.txt
 
 # 3. Configure environment
 copy .env.example .env
-# Edit .env — at minimum set SECRET_KEY (any long random string).
-# To enable real AI plans, add your Gemini key from
-# https://aistudio.google.com/apikey
+# Edit .env — at minimum:
+#   SECRET_KEY=any-long-random-string
+#   GEMINI_API_KEY=your_key   (free key at https://aistudio.google.com/apikey)
 
 # 4. Run migrations
 python manage.py migrate
 
-# 5. Create admin user
-python manage.py createsuperuser
-# (or use the seeded admin: username=admin, password=admin12345)
-
-# 6. (Demo) Seed fake data + train churn model
+# 5. (Demo) Seed fake data + train churn model
 python manage.py seed_demo --clear
 python manage.py train_churn
 
-# 7. Run dev server
+# 6. Run dev server
 python manage.py runserver
 ```
 
 Open http://127.0.0.1:8000/
 
----
+### Default demo credentials
 
-## 🎬 Demo Walk-through (5 min)
-
-1. **Public site** — `/` shows services, team members, and contact form.
-2. **Member sign-up** — `/portal/signup/` → fill profile, pick a plan, get auto-logged-in.
-3. **Member dashboard** — `/portal/dashboard/` — stats: days remaining, BMI, attendance count, payments. Click **Check In** to log a visit.
-4. **AI plan generation** — click **Generate AI Plan** → calls Gemini → saves a `WorkoutPlan` + `DietPlan`. View the parsed JSON rendered as a 7-day accordion.
-5. **Admin panel** — `/admin_login/` (admin / admin12345)
-   - Dashboard: live KPIs, **monthly revenue bar chart**, **ML-predicted at-risk members** with probability bars
-   - Members list: search box, pagination, edit, delete, **CSV export**
-6. **Django admin** — `/admin/` for raw model access (custom User, Subscription, Payment, Attendance, AI plans).
+| Role | URL | Username | Password |
+|---|---|---|---|
+| Admin | `/admin_login/` | `admin` | `admin12345` |
+| Member | `/portal/login/` | `newtest` | `secret123` |
+| Trainer | `/trainer/login/` | `coach_ravi` | `coach1234` |
 
 ---
 
-## 🤖 AI Integration #1 — Gemini Workout & Diet Generator
+## 🎬 Demo Walk-through (~7 min)
 
-**File:** `project/ai_service.py`
+1. **Public site** → `/` — services, team, contact form, Member Login + Join Now buttons
+2. **Member sign-up** — `/portal/signup/` → fill profile, pick plan, auto-login
+3. **Member dashboard** — `/portal/dashboard/`
+   - Stats: days remaining, BMI, attendance count
+   - **Your Gym Entry QR** — printable code
+   - **Generate AI Plan** → calls Gemini → 7-day workout + diet
+   - **Chat bubble** (bottom-right) → conversational AI fitness coach
+   - **Body Analysis** button → upload photo → Gemini Vision response
+   - Download plan & receipts as PDF
+4. **QR scanner demo** — log in as admin → SCANNER in nav → grant camera permission → point at the QR on a member's dashboard → JSON response with member name + plan + days left
+5. **Trainer portal** — `/trainer/login/` (coach_ravi/coach1234)
+   - 5 assigned members in a table
+   - Click any → see their full profile + AI workout in accordion + notes editor
+6. **Admin dashboard** — `/admin_login/` (admin/admin12345)
+   - 6 stat cards including active members + 6-month revenue
+   - **Monthly Revenue** bar chart
+   - **Signup Forecast** line chart (solid actual + dashed predicted)
+   - **Churn Risk (ML)** table with probability bars
+   - CSV export, members search/edit/paginate
+7. **REST API** — `/api/docs/` opens Swagger UI
+   - `POST /api/auth/login/` with admin creds → returns JWT
+   - `GET /api/me/` with `Authorization: Bearer <token>` → user + member
+   - `GET /api/members/` — admin sees all 60+, member sees only own record
+
+---
+
+## 🤖 AI Integrations (Detail)
+
+### #1 — Workout & Diet Plan Generator
+**File:** `project/ai_service.py` → `generate_fitness_plan(member)`
 
 Flow:
 ```
-Member profile
-  ↓ (PROMPT_TEMPLATE with goal, BMI, experience, diet preference)
-Gemini 1.5 Flash (response_mime_type=application/json)
-  ↓
-Parsed dict → saved to WorkoutPlan + DietPlan (JSONField)
-  ↓
-Rendered as 7-day accordion + meal cards
+Member profile (age, BMI, goal, diet, experience)
+   ↓ embedded in PROMPT_TEMPLATE
+Gemini gemini-flash-latest with response_mime_type='application/json'
+   ↓
+{ summary, workout: [7 days × exercises], diet: [7 days × meals], tips: [...] }
+   ↓
+WorkoutPlan + DietPlan (JSONField) — re-rendered without re-calling API
 ```
+**Graceful fallback:** if `GEMINI_API_KEY` is empty, a deterministic mock plan is returned so the UI works offline.
 
-**Graceful fallback:** if `GEMINI_API_KEY` is empty, a deterministic mock plan is returned. The UI works end-to-end without an internet connection or API key.
+### #2 — Member Chatbot
+**File:** `project/ai_service.py` → `chat_reply(member, message, history)`
 
-**Why this is interesting in an interview:**
-- Real prompt-engineering with structured JSON output
-- Schema-driven generation (`response_mime_type='application/json'`)
-- Error handling for malformed responses (regex strip + JSON parse fallback)
-- Storage as `JSONField` — query-able and re-rendered without re-calling the API
+- Floating widget injected via `templates/portal/base.html` for any logged-in member
+- System prompt embeds member profile (age, BMI, goal, plan, expiry)
+- Each request sends last 10 messages as Gemini chat history
+- Endpoint: `POST /portal/chat/send/` (JSON), `GET /portal/chat/history/` (JSON)
+- Persists every turn in the `ChatMessage` model
+
+### #3 — Body Vision Analyzer
+**File:** `project/ai_service.py` → `analyze_body_photo(member, image_bytes)`
+
+- Member uploads JPEG/PNG (≤5 MB) at `/portal/ai/body/`
+- Sent to Gemini Vision as multi-part content alongside the prompt
+- Returns 3 sections: posture & proportions, focus areas, encouragement
+- Photo + analysis stored in `BodyAnalysis` for history & progress tracking
+- Refuses to claim exact body-fat % (responsible-AI guardrail in prompt)
+
+### Cross-cutting design
+- All three AIs share the same `GEMINI_API_KEY`
+- All three have a mock fallback so the project works without internet/key
+- Errors are logged and surfaced to the user via Django messages framework
 
 ---
 
-## 🧠 AI Integration #2 — Churn Predictor (scikit-learn)
+## 🧠 ML Models (Detail)
 
-**File:** `project/ml_service.py`
+### Churn Predictor — `project/ml_service.py`
 
 | Component | Detail |
 |---|---|
 | Model | `RandomForestClassifier(n_estimators=100, max_depth=6)` |
 | Features | age, days_since_join, days_to_expiry, attendance_last_30, attendance_total, payments_count, avg_days_between_visits, plan_amount |
-| Label | `1` if member's last subscription expired AND they didn't renew within 14 days |
+| Label | 1 if last subscription expired AND no renewal within 14 days |
 | Storage | `joblib.dump` → `ml_models/churn.pkl` |
 | Surface | `predict_at_risk_members(top_n=10)` → admin dashboard with progress bars |
 
 ```bash
-python manage.py seed_demo --clear   # 60 synthetic members with varied engagement
+python manage.py seed_demo --clear   # 60 synthetic members
 python manage.py train_churn          # trains + reports feature importances
 ```
 
-Sample output:
-```
-Trained on 57 rows · accuracy=1.0
-Top features:
-  days_to_expiry                 0.466
-  avg_days_between_visits        0.146
-  plan_amount                    0.131
-  attendance_total               0.106
-  ...
-```
+### Signup Demand Forecaster — `project/ml_service.py`
 
-**Honest note:** the synthetic seed data has clean separability, hence the high accuracy. Real-world churn data would land in the 70–85 % range — the same code applies; only the data changes.
+| Component | Detail |
+|---|---|
+| Model | `LinearRegression()` with 3 features: time index + sin(2π·m/12) + cos(2π·m/12) |
+| Why | Captures linear trend + 12-month seasonality without needing Prophet |
+| Output | Next 3 months of predicted signup counts |
+| Surface | Line chart on admin dashboard (solid history + dashed forecast) |
+
+The seasonal feature lets the model say *"July has been strong every year, so July 2026 will likely be strong too"* even if the trend is flat.
+
+---
+
+## 🔌 REST API
+
+Base URL: `/api/`
+
+### Auth
+```
+POST /api/auth/login/   { "username": "...", "password": "..." }   → { access, refresh }
+POST /api/auth/refresh/ { "refresh": "..." }                       → { access }
+POST /api/auth/verify/  { "token": "..." }                         → 200/401
+```
+Pass `Authorization: Bearer <access>` on subsequent requests.
+
+### Resources
+| URL | Verbs | Notes |
+|---|---|---|
+| `/api/me/` | GET | Authenticated user + linked member if any |
+| `/api/plans/` | GET, POST, PUT, DELETE | Members can list; only admins write |
+| `/api/members/` | GET, POST, PUT, DELETE | Members see only their own row |
+| `/api/subscriptions/` | GET, POST, PUT, DELETE | Same scope as members |
+| `/api/payments/` | GET, POST, PUT, DELETE | Same scope as members |
+| `/api/attendance/` | GET, POST, PUT, DELETE | Same scope as members |
+| `/api/enquiries/` | POST (public), others admin-only | Lead capture |
+| `/api/equipment/` | All verbs | Admin-only |
+| `/api/workout-plans/` | GET (read-only) | Member sees own |
+| `/api/diet-plans/` | GET (read-only) | Member sees own |
+
+### Docs
+- `/api/docs/` — Swagger UI
+- `/api/redoc/` — ReDoc
+- `/api/schema/` — OpenAPI schema (JSON)
 
 ---
 
@@ -143,24 +225,36 @@ Top features:
 
 ```
 myproject/
-├── accounts/                 # Custom User model (admin / trainer / member)
+├── accounts/                       # Custom User (admin / trainer / member)
 ├── project/
-│   ├── models.py            # 12 models: Member, Plan, Subscription, Payment,
-│   │                        #   Attendance, WorkoutPlan, DietPlan, ...
-│   ├── views.py             # Public + admin CRUD + reports + CSV export
-│   ├── member_views.py      # Member-portal views (signup/login/dashboard/AI)
-│   ├── forms.py             # ModelForms with Bootstrap auto-styling mixin
-│   ├── ai_service.py        # Gemini integration
-│   ├── ml_service.py        # Churn predictor (train + predict)
-│   └── management/commands/
-│       ├── seed_demo.py     # Generates demo data
-│       └── train_churn.py   # Trains the churn model
-├── myproject/                # Settings, root URLs
+│   ├── models.py                   # 16 models including Trainer, ChatMessage, BodyAnalysis
+│   ├── views.py                    # Public + admin CRUD + reports + CSV + QR scanner
+│   ├── member_views.py             # Member-portal (signup/login/dashboard/chat/AI/PDFs/QR)
+│   ├── trainer_views.py            # Trainer-portal (login/dashboard/member detail/notes)
+│   ├── forms.py                    # ModelForms with Bootstrap auto-styling mixin
+│   ├── ai_service.py               # Gemini: plan generator, chat, vision
+│   ├── ml_service.py               # Churn predictor + signup forecaster
+│   ├── pdf_service.py              # AI plan PDF + receipt PDF
+│   ├── api/
+│   │   ├── serializers.py          # 10 DRF serializers
+│   │   ├── views.py                # Viewsets with role-scoped querysets
+│   │   └── urls.py                 # Router + JWT + Swagger
+│   ├── management/commands/
+│   │   ├── seed_demo.py            # Generates 60 fake members
+│   │   └── train_churn.py          # Trains the churn model
+│   └── tests/
+│       ├── test_models.py          # 11 model tests
+│       ├── test_member_views.py    # 13 portal flow tests
+│       ├── test_ai_service.py      # 5 AI tests (mock + real path with patched SDK)
+│       └── test_ml_service.py      # 6 ML feature/labelling tests
+├── myproject/                      # settings, root URLs
 ├── templates/
-│   ├── admin_panel/         # Admin pages
-│   └── portal/              # Member-portal pages
-├── static/                  # CSS / images
-├── ml_models/               # Trained .pkl files (gitignored)
+│   ├── admin_panel/                # Admin pages (shared .panel CSS in navbar)
+│   ├── portal/                     # Member portal pages + chatbot widget
+│   └── trainer/                    # Trainer portal pages
+├── static/                         # CSS / images
+├── ml_models/                      # Persisted .pkl files (gitignored)
+├── pytest.ini
 └── manage.py
 ```
 
@@ -172,27 +266,65 @@ See `.env.example`. Key vars:
 
 | Var | Default | Purpose |
 |---|---|---|
-| `DEBUG` | True | Dev mode |
-| `SECRET_KEY` | — | Required |
-| `USE_MYSQL` | False | Switch from SQLite to MySQL |
-| `USE_S3` | False | Switch from local storage to AWS S3 |
-| `GEMINI_API_KEY` | empty | Enable real Gemini calls (mock fallback otherwise) |
+| `DEBUG` | `True` | Dev mode |
+| `SECRET_KEY` | — | **Required** |
+| `ALLOWED_HOSTS` | `127.0.0.1,localhost` | |
+| `USE_MYSQL` | `False` | Switch from SQLite to MySQL |
+| `USE_S3` | `False` | Switch from local storage to AWS S3 |
+| `GEMINI_API_KEY` | empty | Enables real AI; mock fallback otherwise |
+| `CSRF_TRUSTED_ORIGINS` | `http://127.0.0.1:8000` | Add prod hosts when deploying |
 
 ---
 
-## 📝 What's intentionally NOT in scope
+## 🧪 Testing
 
-- Production deployment (Docker / CI / monitoring) — kept local-first for clarity
-- Payment gateway integration (Razorpay / Stripe) — `Payment` records are manually created
-- Email notifications / Celery — easy add via Django's email backend, deferred for demo brevity
-- REST API — DRF would slot into this codebase cleanly; out of scope for v1
+```bash
+python -m pytest
+```
+
+```
+================================================== 32 passed in 11s ==================================================
+```
+
+The AI tests use `unittest.mock.patch` to replace `google.generativeai.GenerativeModel`, so the suite never makes real API calls — fast and free to run in CI.
+
+---
+
+## 🛠️ Useful Management Commands
+
+```bash
+python manage.py seed_demo --clear   # 60 synthetic members + plans + payments + attendance
+python manage.py train_churn         # retrain ML model with current data
+python manage.py createsuperuser     # standard Django admin user
+```
 
 ---
 
 ## 🪜 Roadmap
 
-- [ ] Razorpay/Stripe live payments
-- [ ] Email expiry reminders via Celery + Redis
-- [ ] DRF API + JWT auth for a mobile client
-- [ ] Trainer dashboard (assign workouts, view assigned members)
-- [ ] QR-code attendance scanner
+Already shipped — see Highlights table at top.
+
+Possible next steps:
+- [ ] Razorpay/Stripe live payments (replaces dummy `Payment` records)
+- [ ] Email expiry reminders (Django Q2 + console backend → real SMTP later)
+- [ ] PWA manifest so the member portal installs on phones
+- [ ] Anomaly detection on attendance patterns (IsolationForest)
+- [ ] Mobile-friendly trainer attendance scanner
+- [ ] Multi-language support via Django's `i18n`
+
+---
+
+## 📝 What's intentionally NOT included
+
+- Production deployment (Docker / CI / monitoring) — kept local-first for clarity
+- Payment gateway integration — `Payment` rows are created manually or via signup
+- SMTP email — easy to enable via `EMAIL_BACKEND` setting
+- Cloud-only services — every feature runs on your laptop; only Gemini calls leave the machine
+
+---
+
+## 🙏 Credits & License
+
+Educational project. Free to fork, study, and extend.
+
+> *Three AI integrations, two ML models, three user roles, REST API, and 32 tests — all running on a free Gemini key and a single SQLite file.*

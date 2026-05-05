@@ -147,6 +147,80 @@ def predict_for_member(member: Member) -> float | None:
     return float(bundle['model'].predict_proba(df)[0][1])
 
 
+def forecast_signups(months_ahead: int = 3) -> dict:
+    """
+    Forecast next N months of signups using a simple LinearRegression on past
+    monthly signup counts (with a 12-month seasonal feature).
+
+    Returns:
+        {
+          'history':  [{'month': 'Jan 2026', 'count': 8}, ...],
+          'forecast': [{'month': 'Jun 2026', 'count': 11}, ...],
+        }
+    """
+    import calendar
+    from datetime import date
+    from collections import OrderedDict
+    from sklearn.linear_model import LinearRegression
+    import numpy as np
+
+    members = Member.objects.values_list('join_date', flat=True)
+    if not members:
+        return {'history': [], 'forecast': []}
+
+    # Bucket by year-month
+    buckets = OrderedDict()
+    for d in members:
+        if not d:
+            continue
+        key = (d.year, d.month)
+        buckets[key] = buckets.get(key, 0) + 1
+
+    if len(buckets) < 3:
+        # Not enough data to fit
+        history = [{'month': f"{calendar.month_abbr[m]} {y}", 'count': c}
+                   for (y, m), c in sorted(buckets.items())]
+        return {'history': history, 'forecast': []}
+
+    # Fill gaps in months between min and max
+    all_keys = sorted(buckets.keys())
+    start_y, start_m = all_keys[0]
+    end_y, end_m = all_keys[-1]
+    series_keys = []
+    y, m = start_y, start_m
+    while (y, m) <= (end_y, end_m):
+        series_keys.append((y, m))
+        m += 1
+        if m > 12:
+            y += 1
+            m = 1
+    counts = [buckets.get(k, 0) for k in series_keys]
+
+    # Features: month index + sin/cos of month-of-year for seasonality
+    X = np.array([[i, np.sin(2 * np.pi * k[1] / 12), np.cos(2 * np.pi * k[1] / 12)]
+                  for i, k in enumerate(series_keys)])
+    y_arr = np.array(counts)
+
+    model = LinearRegression().fit(X, y_arr)
+
+    # Forecast
+    last_y, last_m = series_keys[-1]
+    forecast = []
+    for step in range(1, months_ahead + 1):
+        last_m += 1
+        if last_m > 12:
+            last_y += 1
+            last_m = 1
+        idx = len(series_keys) - 1 + step
+        Xf = np.array([[idx, np.sin(2 * np.pi * last_m / 12), np.cos(2 * np.pi * last_m / 12)]])
+        pred = max(0, int(round(float(model.predict(Xf)[0]))))
+        forecast.append({'month': f"{calendar.month_abbr[last_m]} {last_y}", 'count': pred})
+
+    history = [{'month': f"{calendar.month_abbr[m]} {y}", 'count': c}
+               for (y, m), c in zip(series_keys, counts)]
+    return {'history': history, 'forecast': forecast}
+
+
 def predict_at_risk_members(threshold: float = 0.0, top_n: int | None = None) -> list[tuple[Member, float]]:
     """Return active members sorted by descending churn probability.
 

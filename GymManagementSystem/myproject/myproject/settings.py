@@ -22,11 +22,43 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     'django_cleanup.apps.CleanupConfig',
+    'rest_framework',
+    'rest_framework_simplejwt',
+    'drf_spectacular',
     'accounts',
     'project',
 ]
 
 AUTH_USER_MODEL = 'accounts.User'
+
+# =========================
+# DRF
+# =========================
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
+    ),
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 25,
+}
+
+from datetime import timedelta as _td  # noqa: E402
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': _td(hours=1),
+    'REFRESH_TOKEN_LIFETIME': _td(days=7),
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'GymPro API',
+    'DESCRIPTION': 'REST API for the GymPro management system (members, plans, payments, attendance, AI plans).',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+}
 
 # =========================
 # MIDDLEWARE

@@ -13,6 +13,9 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     {{ chart_labels|json_script:"chart-labels" }}
     {{ chart_data|json_script:"chart-data" }}
+    {{ forecast_labels|json_script:"fc-labels" }}
+    {{ forecast_history|json_script:"fc-history" }}
+    {{ forecast_predicted|json_script:"fc-predicted" }}
 
     <style>
       /* General Styles */
@@ -115,6 +118,14 @@
         <div class="p-3 rounded mb-4" style="background:#222;">
           <h5 class="text-warning"><i class="bi bi-bar-chart"></i> Monthly Revenue</h5>
           <canvas id="revenueChart" height="80"></canvas>
+        </div>
+        {% endif %}
+
+        {% if forecast_labels %}
+        <div class="p-3 rounded mb-4" style="background:#222;">
+          <h5 class="text-warning"><i class="bi bi-graph-up-arrow"></i> Signup Forecast (next 3 months)</h5>
+          <p class="text-muted small mb-2">Linear regression with 12-month seasonality on past signups. Solid = actual, dashed = predicted.</p>
+          <canvas id="forecastChart" height="80"></canvas>
         </div>
         {% endif %}
 
@@ -235,6 +246,29 @@
           },
           options: {
             scales: { y: { ticks: { color: '#ddd' }, grid: { color: '#333' } },
+                      x: { ticks: { color: '#ddd' }, grid: { color: '#333' } } },
+            plugins: { legend: { labels: { color: '#fff' } } }
+          }
+        });
+      }
+
+      const fcLabels = JSON.parse(document.getElementById('fc-labels')?.textContent || '[]');
+      const fcHist = JSON.parse(document.getElementById('fc-history')?.textContent || '[]');
+      const fcPred = JSON.parse(document.getElementById('fc-predicted')?.textContent || '[]');
+      if (fcLabels.length) {
+        new Chart(document.getElementById('forecastChart'), {
+          type: 'line',
+          data: {
+            labels: fcLabels,
+            datasets: [
+              { label: 'Actual signups', data: fcHist, borderColor: '#80e1a1', backgroundColor: 'rgba(128,225,161,0.1)',
+                spanGaps: true, tension: 0.25, pointRadius: 4 },
+              { label: 'Predicted', data: fcPred, borderColor: '#f8b400', borderDash: [6, 4],
+                backgroundColor: 'rgba(248,180,0,0.1)', spanGaps: true, tension: 0.25, pointRadius: 4 }
+            ]
+          },
+          options: {
+            scales: { y: { ticks: { color: '#ddd' }, grid: { color: '#333' }, beginAtZero: true },
                       x: { ticks: { color: '#ddd' }, grid: { color: '#333' } } },
             plugins: { legend: { labels: { color: '#fff' } } }
           }

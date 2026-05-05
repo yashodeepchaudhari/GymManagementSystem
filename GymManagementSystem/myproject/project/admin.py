@@ -1,7 +1,8 @@
 from django.contrib import admin
 from .models import (
     TeamMember, Contact, Enquiry, Plan, Equipment, Member, Image,
-    Subscription, Payment, Attendance, WorkoutPlan, DietPlan,
+    Subscription, Payment, Attendance, WorkoutPlan, DietPlan, ChatMessage,
+    BodyAnalysis, Trainer, MemberTrainer,
 )
 
 
@@ -44,6 +45,10 @@ class MemberAdmin(admin.ModelAdmin):
     search_fields = ('name', 'email', 'contact')
     list_filter = ('plan', 'gender', 'goal')
 
+    def is_active(self, obj):
+        return obj.is_active
+    is_active.boolean = True
+
 
 @admin.register(Subscription)
 class SubscriptionAdmin(admin.ModelAdmin):
@@ -75,6 +80,34 @@ class WorkoutPlanAdmin(admin.ModelAdmin):
 class DietPlanAdmin(admin.ModelAdmin):
     list_display = ('member', 'goal', 'diet_type', 'created_at')
     list_filter = ('goal', 'diet_type', 'created_at')
+
+
+@admin.register(Trainer)
+class TrainerAdmin(admin.ModelAdmin):
+    list_display = ('name', 'specialty', 'user')
+    list_filter = ('specialty',)
+    search_fields = ('name', 'user__username')
+
+
+@admin.register(MemberTrainer)
+class MemberTrainerAdmin(admin.ModelAdmin):
+    list_display = ('member', 'trainer', 'updated_at')
+    search_fields = ('member__name', 'trainer__name')
+    autocomplete_fields = ('member', 'trainer')
+
+
+@admin.register(BodyAnalysis)
+class BodyAnalysisAdmin(admin.ModelAdmin):
+    list_display = ('member', 'weight_kg', 'created_at')
+    list_filter = ('created_at',)
+    search_fields = ('member__name',)
+
+
+@admin.register(ChatMessage)
+class ChatMessageAdmin(admin.ModelAdmin):
+    list_display = ('member', 'role', 'created_at')
+    list_filter = ('role', 'created_at')
+    search_fields = ('member__name', 'content')
 
 
 admin.site.register(Image)

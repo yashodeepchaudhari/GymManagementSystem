@@ -77,11 +77,14 @@
           </ul>
         </li>
 
+        <li class="nav-item"><a class="nav-link" href="{% url 'qr_scanner' %}"><i class="bi bi-qr-code-scan"></i> SCANNER</a></li>
+
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">PORTAL</a>
           <ul class="dropdown-menu">
             <li><a class="dropdown-item" href="{% url 'member_signup' %}" target="_blank">Member Signup Page</a></li>
             <li><a class="dropdown-item" href="{% url 'member_login' %}" target="_blank">Member Login Page</a></li>
+            <li><a class="dropdown-item" href="{% url 'trainer_login' %}" target="_blank">Trainer Login Page</a></li>
             <li><a class="dropdown-item" href="{% url 'home' %}" target="_blank">Public Site</a></li>
           </ul>
         </li>
