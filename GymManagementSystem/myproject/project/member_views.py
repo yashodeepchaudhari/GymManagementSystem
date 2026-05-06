@@ -4,6 +4,7 @@ from django import forms
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from django.shortcuts import redirect, render, get_object_or_404
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -98,35 +99,41 @@ def member_signup(request):
         form = MemberSignupForm(request.POST)
         if form.is_valid():
             cd = form.cleaned_data
-            user = User.objects.create_user(
-                username=cd['username'],
-                email=cd['email'],
-                password=cd['password'],
-                role=User.Role.MEMBER,
-                phone=cd['contact'],
-            )
-            today = timezone.now().date()
-            member = Member.objects.create(
-                user=user,
-                name=cd['name'],
-                contact=cd['contact'],
-                email=cd['email'],
-                age=cd['age'],
-                gender=cd['gender'],
-                plan=cd['plan'],
-                join_date=today,
-                amount=int(cd['plan'].amount),
-                height_cm=cd.get('height_cm'),
-                weight_kg=cd.get('weight_kg'),
-                goal=cd.get('goal') or '',
-                experience=cd.get('experience') or '',
-                diet=cd.get('diet') or '',
-            )
-            sub = Subscription.objects.create(member=member, plan=cd['plan'], start_date=today)
-            Payment.objects.create(
-                subscription=sub, member=member,
-                amount=cd['plan'].amount, mode='cash', status='paid',
-            )
+            try:
+                with transaction.atomic():
+                    user = User.objects.create_user(
+                        username=cd['username'],
+                        email=cd['email'],
+                        password=cd['password'],
+                        role=User.Role.MEMBER,
+                        phone=cd['contact'],
+                    )
+                    today = timezone.now().date()
+                    member = Member.objects.create(
+                        user=user,
+                        name=cd['name'],
+                        contact=cd['contact'],
+                        email=cd['email'],
+                        age=cd['age'],
+                        gender=cd['gender'],
+                        plan=cd['plan'],
+                        join_date=today,
+                        amount=int(cd['plan'].amount),
+                        height_cm=cd.get('height_cm'),
+                        weight_kg=cd.get('weight_kg'),
+                        goal=cd.get('goal') or '',
+                        experience=cd.get('experience') or '',
+                        diet=cd.get('diet') or '',
+                    )
+                    sub = Subscription.objects.create(member=member, plan=cd['plan'], start_date=today)
+                    Payment.objects.create(
+                        subscription=sub, member=member,
+                        amount=cd['plan'].amount, mode='cash', status='paid',
+                    )
+            except Exception as e:
+                messages.error(request, f"Signup failed: {e}. Please try again.")
+                return render(request, 'portal/signup.html', {'form': form})
+
             login(request, user)
             messages.success(
                 request,
@@ -192,9 +199,10 @@ def member_dashboard(request):
 
     member = getattr(request.user, 'member_profile', None)
     if not member:
-        messages.error(request, "No member profile linked to this account. Please contact admin.")
-        logout(request)
-        return redirect('member_login')
+        # Orphan user — User exists with role=member but no Member row.
+        # Send them to the recovery page to finish setup instead of logging out.
+        messages.info(request, "Almost there! Please complete your profile to activate your membership.")
+        return redirect('member_complete_profile')
 
     month_start = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     workout_plan = member.workout_plans.first()
@@ -212,6 +220,79 @@ def member_dashboard(request):
         'expiring_soon': member.is_active and member.days_remaining <= 7,
     }
     return render(request, 'portal/dashboard.html', context)
+
+
+class CompleteProfileForm(_BootstrapMixin, forms.Form):
+    """Recovery form for users that have an account but no Member profile yet."""
+    name = forms.CharField(max_length=100, label="Full Name")
+    contact = forms.CharField(max_length=15, label="Phone Number")
+    age = forms.IntegerField(min_value=10, max_value=100)
+    gender = forms.ChoiceField(choices=Member.GENDER_CHOICES)
+    plan = forms.ModelChoiceField(queryset=Plan.objects.all(), empty_label="-- Choose a plan --")
+
+    height_cm = forms.IntegerField(required=False, min_value=80, max_value=250, label="Height (cm)")
+    weight_kg = forms.IntegerField(required=False, min_value=20, max_value=300, label="Weight (kg)")
+    goal = forms.ChoiceField(required=False, choices=[('', '— Select —')] + Member.GOAL_CHOICES)
+    experience = forms.ChoiceField(required=False, choices=[('', '— Select —')] + Member.EXPERIENCE_CHOICES)
+    diet = forms.ChoiceField(required=False, choices=[('', '— Select —')] + Member.DIET_CHOICES)
+
+
+@login_required(login_url='member_login')
+def member_complete_profile(request):
+    """For users who have an account (User row) but no Member row.
+    Lets them finish setup by picking a plan and filling personal details."""
+    if not _is_member(request.user):
+        logout(request)
+        return redirect('member_login')
+
+    if Member.objects.filter(user=request.user).exists():
+        return redirect('member_dashboard')
+
+    if not Plan.objects.exists():
+        messages.warning(request, "No membership plans available. Please contact the gym.")
+
+    if request.method == 'POST':
+        form = CompleteProfileForm(request.POST)
+        if form.is_valid():
+            cd = form.cleaned_data
+            # Use the user's existing email; require it to be unique among Members
+            if Member.objects.filter(email__iexact=request.user.email).exists():
+                messages.error(request, "A member with your email already exists. Contact admin.")
+                return render(request, 'portal/complete_profile.html', {'form': form})
+
+            try:
+                with transaction.atomic():
+                    today = timezone.now().date()
+                    member = Member.objects.create(
+                        user=request.user,
+                        name=cd['name'],
+                        contact=cd['contact'],
+                        email=request.user.email,
+                        age=cd['age'],
+                        gender=cd['gender'],
+                        plan=cd['plan'],
+                        join_date=today,
+                        amount=int(cd['plan'].amount),
+                        height_cm=cd.get('height_cm'),
+                        weight_kg=cd.get('weight_kg'),
+                        goal=cd.get('goal') or '',
+                        experience=cd.get('experience') or '',
+                        diet=cd.get('diet') or '',
+                    )
+                    sub = Subscription.objects.create(member=member, plan=cd['plan'], start_date=today)
+                    Payment.objects.create(
+                        subscription=sub, member=member,
+                        amount=cd['plan'].amount, mode='cash', status='paid',
+                    )
+            except Exception as e:
+                messages.error(request, f"Could not finish setup: {e}")
+                return render(request, 'portal/complete_profile.html', {'form': form})
+
+            messages.success(request, f"Welcome, {member.name}! Your membership is active.")
+            return redirect('member_dashboard')
+    else:
+        form = CompleteProfileForm()
+    return render(request, 'portal/complete_profile.html', {'form': form})
 
 
 @login_required(login_url='member_login')

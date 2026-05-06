@@ -51,6 +51,7 @@ urlpatterns = [
     path('portal/logout/', mv.member_logout, name='member_logout'),
     path('portal/dashboard/', mv.member_dashboard, name='member_dashboard'),
     path('portal/profile/', mv.member_profile, name='member_profile'),
+    path('portal/complete-profile/', mv.member_complete_profile, name='member_complete_profile'),
     path('portal/renew/', mv.member_renew, name='member_renew'),
     path('portal/check-in/', mv.member_check_in, name='member_check_in'),
     path('portal/qr.png', mv.member_qr, name='member_qr'),
