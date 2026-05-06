@@ -1,5 +1,7 @@
+import os
 from pathlib import Path
 from decouple import config, Csv
+import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -65,6 +67,7 @@ SPECTACULAR_SETTINGS = {
 # =========================
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -98,11 +101,18 @@ WSGI_APPLICATION = 'myproject.wsgi.application'
 
 # =========================
 # DATABASE
-# Local SQLite by default; switch by setting USE_MYSQL=True in .env
+# Priority: DATABASE_URL (Render/Heroku-style) > USE_MYSQL > local SQLite
 # =========================
+DATABASE_URL = config('DATABASE_URL', default='')
 USE_MYSQL = config('USE_MYSQL', default=False, cast=bool)
 
-if USE_MYSQL:
+if DATABASE_URL:
+    DATABASES = {
+        'default': dj_database_url.parse(
+            DATABASE_URL, conn_max_age=600, ssl_require=True
+        )
+    }
+elif USE_MYSQL:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.mysql',
@@ -141,13 +151,14 @@ USE_TZ = True
 
 # =========================
 # STATIC & MEDIA
-# Local filesystem by default; S3 if USE_S3=True
+# Priority: S3 (USE_S3=True) > WhiteNoise + persistent disk (default in prod)
 # =========================
 USE_S3 = config('USE_S3', default=False, cast=bool)
 
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-MEDIA_ROOT = BASE_DIR / 'media'
+# On Render, mount a persistent disk at /opt/render/project/src/media for uploads
+MEDIA_ROOT = config('MEDIA_ROOT', default=str(BASE_DIR / 'media'))
 
 if USE_S3:
     INSTALLED_APPS += ['storages']
@@ -170,6 +181,10 @@ if USE_S3:
     STATIC_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/static/"
     MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/media/"
 else:
+    STORAGES = {
+        "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+        "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+    }
     STATIC_URL = '/static/'
     MEDIA_URL = '/media/'
 
