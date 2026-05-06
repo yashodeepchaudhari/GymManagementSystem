@@ -1,0 +1,103 @@
+{% extends 'portal/base.html' %}
+{% block title %}Sign Up{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card main-card p-4">
+      <div class="text-center mb-3">
+        <h3 class="mb-1">Become a Member</h3>
+        <p class="text-muted">Create your account, choose a plan, and unlock your AI fitness coach.</p>
+      </div>
+
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+      {% endif %}
+
+      <form method="POST" novalidate>
+        {% csrf_token %}
+
+        {# ---------- Account ---------- #}
+        <h6 class="text-uppercase text-primary small fw-bold mt-2"><i class="bi bi-person"></i> Account</h6>
+        <hr class="mt-1 mb-3">
+        <div class="row">
+          <div class="col-md-4 mb-2">
+            <label class="form-label">Username <span class="text-danger">*</span></label>
+            {{ form.username }}
+            {% if form.username.errors %}<div class="text-danger small">{{ form.username.errors.0 }}</div>{% endif %}
+            <div class="form-text">{{ form.username.help_text }}</div>
+          </div>
+          <div class="col-md-4 mb-2">
+            <label class="form-label">Email <span class="text-danger">*</span></label>
+            {{ form.email }}
+            {% if form.email.errors %}<div class="text-danger small">{{ form.email.errors.0 }}</div>{% endif %}
+          </div>
+          <div class="col-md-4 mb-2">
+            <label class="form-label">Password <span class="text-danger">*</span></label>
+            {{ form.password }}
+            {% if form.password.errors %}<div class="text-danger small">{{ form.password.errors.0 }}</div>{% endif %}
+            <div class="form-text">{{ form.password.help_text }}</div>
+          </div>
+        </div>
+
+        {# ---------- Personal ---------- #}
+        <h6 class="text-uppercase text-primary small fw-bold mt-3"><i class="bi bi-card-text"></i> Personal Details</h6>
+        <hr class="mt-1 mb-3">
+        <div class="row">
+          <div class="col-md-4 mb-2">
+            <label class="form-label">Full Name <span class="text-danger">*</span></label>
+            {{ form.name }}
+            {% if form.name.errors %}<div class="text-danger small">{{ form.name.errors.0 }}</div>{% endif %}
+          </div>
+          <div class="col-md-4 mb-2">
+            <label class="form-label">Phone <span class="text-danger">*</span></label>
+            {{ form.contact }}
+          </div>
+          <div class="col-md-2 mb-2">
+            <label class="form-label">Age <span class="text-danger">*</span></label>
+            {{ form.age }}
+          </div>
+          <div class="col-md-2 mb-2">
+            <label class="form-label">Gender <span class="text-danger">*</span></label>
+            {{ form.gender }}
+          </div>
+        </div>
+
+        {# ---------- Plan ---------- #}
+        <h6 class="text-uppercase text-primary small fw-bold mt-3"><i class="bi bi-credit-card"></i> Membership Plan</h6>
+        <hr class="mt-1 mb-3">
+        <div class="mb-2">
+          <label class="form-label">Choose a Plan <span class="text-danger">*</span></label>
+          {{ form.plan }}
+          {% if form.plan.errors %}<div class="text-danger small">{{ form.plan.errors.0 }}</div>{% endif %}
+          <div class="form-text">Your expiry date is computed automatically from the plan duration.</div>
+        </div>
+
+        {# ---------- Optional fitness profile ---------- #}
+        <h6 class="text-uppercase text-primary small fw-bold mt-3">
+          <i class="bi bi-magic"></i> Fitness Profile
+          <span class="text-muted fw-normal">(optional, used by AI plan generator)</span>
+        </h6>
+        <hr class="mt-1 mb-3">
+        <div class="row">
+          <div class="col-md-2 mb-2"><label class="form-label">Height (cm)</label>{{ form.height_cm }}</div>
+          <div class="col-md-2 mb-2"><label class="form-label">Weight (kg)</label>{{ form.weight_kg }}</div>
+          <div class="col-md-3 mb-2"><label class="form-label">Goal</label>{{ form.goal }}</div>
+          <div class="col-md-3 mb-2"><label class="form-label">Experience</label>{{ form.experience }}</div>
+          <div class="col-md-2 mb-2"><label class="form-label">Diet</label>{{ form.diet }}</div>
+        </div>
+        <div class="form-text mb-3">You can fill these later from your profile page — but the AI generator needs them.</div>
+
+        <button type="submit" class="btn btn-primary w-100 mt-3">
+          <i class="bi bi-check2-circle"></i> Create Account & Activate Membership
+        </button>
+
+        <p class="text-center mt-3 mb-0">Already a member? <a href="{% url 'member_login' %}" class="fw-bold">Log in here</a></p>
+        <p class="text-center mt-1 small">
+          <a href="{% url 'home' %}" class="text-muted"><i class="bi bi-arrow-left"></i> Back to home</a>
+        </p>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

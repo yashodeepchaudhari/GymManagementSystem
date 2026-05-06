@@ -70,10 +70,12 @@
             <li><a href="#contact">Contact</a></li>
 
             <li><a href="home_gallery">GALLERY</a></li>
+            <li><a href="{% url 'member_login' %}">MEMBER LOGIN</a></li>
           </ul>
           <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
         </nav>
 
+        <a class="btn-getstarted" href="{% url 'member_signup' %}" style="margin-right:10px; background:#f8b400; color:#000;">Join Now</a>
         <a class="btn-getstarted" href="{% url 'admin_login' %}">Admin Login</a>
       </div>
     </header>

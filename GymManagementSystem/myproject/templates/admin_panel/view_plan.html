@@ -4,73 +4,47 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>View Plans</title>
-
-    <style>
-      body {
-        font-family: Arial, sans-serif;
-        margin: 50px;
-        text-align: center;
-      }
-      table {
-        width: 80%;
-        margin: auto;
-        border-collapse: collapse;
-      }
-      th,
-      td {
-        border: 1px solid #ddd;
-        padding: 10px;
-        text-align: center;
-      }
-      th {
-        background-color: #f4f4f4;
-      }
-      button {
-        background-color: #d9534f;
-        color: white;
-        padding: 8px 12px;
-        border: none;
-        cursor: pointer;
-        border-radius: 5px;
-      }
-      button:hover {
-        background-color: #c9302c;
-      }
-    </style>
   </head>
   <body>
-    {% include "admin_panel/navbar.html" %} {% block content %} {% endblock %}
+    {% include "admin_panel/navbar.html" %}
 
-    <h2 style="color: #007bff">View Plans</h2>
+    <div class="panel">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="mb-0">Plans</h2>
+        <a href="{% url 'add_plan' %}" class="btn btn-primary btn-sm">+ Add Plan</a>
+      </div>
 
-    <table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Amount</th>
-          <th>Plan Name</th>
-          <th>Action</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for plan in plans %}
-        <tr>
-          <td>{{ plan.name }}</td>
-          <td>{{ plan.amount }}</td>
-          <td>{{ plan.duration }}</td>
-          <td>
-            <form action="{% url 'delete_plan' plan.id %}" method="POST">
-              {% csrf_token %}
-              <button type="submit">Delete</button>
-            </form>
-          </td>
-        </tr>
-        {% empty %}
-        <tr>
-          <td colspan="4">No plans available</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+      {% if messages %}
+        {% for message in messages %}<div class="alert alert-info py-2">{{ message }}</div>{% endfor %}
+      {% endif %}
+
+      <div class="table-responsive">
+        <table class="table table-hover align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>Name</th><th>Amount</th><th>Duration</th><th>Days</th><th class="text-end">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for plan in plans %}
+            <tr>
+              <td>{{ plan.name }}</td>
+              <td>₹{{ plan.amount }}</td>
+              <td>{{ plan.duration }}</td>
+              <td>{{ plan.duration_days }}</td>
+              <td class="text-end">
+                <form action="{% url 'delete_plan' plan.id %}" method="POST" style="display:inline" onsubmit="return confirm('Delete plan {{ plan.name }}?');">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-outline-danger btn-action">Delete</button>
+                </form>
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="text-center text-muted">No plans available.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
   </body>
 </html>

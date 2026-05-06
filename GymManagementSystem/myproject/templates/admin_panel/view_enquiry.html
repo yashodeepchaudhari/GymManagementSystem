@@ -3,77 +3,50 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>View Enquiry</title>
-
-    <style>
-      body {
-        font-family: Arial, sans-serif;
-        margin: 50px;
-        text-align: center;
-      }
-      table {
-        width: 80%;
-        margin: auto;
-        border-collapse: collapse;
-      }
-      th,
-      td {
-        border: 1px solid #ddd;
-        padding: 10px;
-        text-align: center;
-      }
-      th {
-        background-color: #f4f4f4;
-      }
-      button {
-        background-color: #d9534f;
-        color: white;
-        padding: 8px 12px;
-        border: none;
-        cursor: pointer;
-        border-radius: 5px;
-      }
-      button:hover {
-        background-color: #c9302c;
-      }
-    </style>
+    <title>View Enquiries</title>
   </head>
   <body>
-    {% include "admin_panel/navbar.html" %} {% block content %} {% endblock %}
-    <h2 style="color: #007bff">View Enquiry</h2>
+    {% include "admin_panel/navbar.html" %}
 
-    <table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Contact</th>
-          <th>Email Id</th>
-          <th>Age</th>
-          <th>Gender</th>
-          <th>Action</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for enquiry in enquiries %}
-        <tr>
-          <td>{{ enquiry.name }}</td>
-          <td>{{ enquiry.contact }}</td>
-          <td>{{ enquiry.email }}</td>
-          <td>{{ enquiry.age }}</td>
-          <td>{{ enquiry.gender }}</td>
-          <td>
-            <form action="{% url 'delete_enquiry' enquiry.id %}" method="POST">
-              {% csrf_token %}
-              <button type="submit">Delete</button>
-            </form>
-          </td>
-        </tr>
-        {% empty %}
-        <tr>
-          <td colspan="6">No enquiries found</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+    <div class="panel">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="mb-0">Enquiries</h2>
+        <a href="{% url 'add_enquiry' %}" class="btn btn-primary btn-sm">+ Add Enquiry</a>
+      </div>
+
+      {% if messages %}
+        {% for message in messages %}<div class="alert alert-info py-2">{{ message }}</div>{% endfor %}
+      {% endif %}
+
+      <div class="table-responsive">
+        <table class="table table-hover align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>Name</th><th>Contact</th><th>Email</th><th>Age</th><th>Gender</th><th>Date</th><th class="text-end">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for enquiry in enquiries %}
+            <tr>
+              <td>{{ enquiry.name }}</td>
+              <td>{{ enquiry.contact }}</td>
+              <td>{{ enquiry.email }}</td>
+              <td>{{ enquiry.age }}</td>
+              <td>{{ enquiry.gender }}</td>
+              <td>{{ enquiry.created_at|date:"d M Y" }}</td>
+              <td class="text-end">
+                <form action="{% url 'delete_enquiry' enquiry.id %}" method="POST" style="display:inline" onsubmit="return confirm('Delete enquiry from {{ enquiry.name }}?');">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-outline-danger btn-action">Delete</button>
+                </form>
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="7" class="text-center text-muted">No enquiries found.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
   </body>
 </html>

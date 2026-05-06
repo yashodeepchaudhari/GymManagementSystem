@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QR Attendance Scanner</title>
+</head>
+<body>
+  {% include "admin_panel/navbar.html" %}
+
+  <div class="panel" style="max-width: 720px;">
+    <h2 class="text-center mb-2"><i class="bi bi-qr-code-scan"></i> Attendance Scanner</h2>
+    <p class="text-center text-muted">Point a member's QR (from their dashboard) at the camera.</p>
+
+    <div class="text-center">
+      <video id="vid" playsinline style="width:100%;max-width:480px;border-radius:10px;background:#000"></video>
+    </div>
+
+    <div id="status" class="alert alert-info mt-3 text-center">Waiting for camera permission…</div>
+
+    <div id="result" class="mt-3"></div>
+
+    <button id="restartBtn" class="btn btn-secondary w-100 mt-2" style="display:none">
+      Scan Another
+    </button>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+  <script>
+    const video = document.getElementById('vid');
+    const statusBox = document.getElementById('status');
+    const resultBox = document.getElementById('result');
+    const restartBtn = document.getElementById('restartBtn');
+    const csrf = document.cookie.match(/csrftoken=([^;]+)/)?.[1];
+
+    let scanning = true;
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    async function start() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment' }, audio: false
+        });
+        video.srcObject = stream;
+        await video.play();
+        statusBox.className = 'alert alert-warning mt-3 text-center';
+        statusBox.textContent = 'Scanning… show a member QR.';
+        requestAnimationFrame(tick);
+      } catch (e) {
+        statusBox.className = 'alert alert-danger mt-3 text-center';
+        statusBox.textContent = 'Camera access denied: ' + e.message;
+      }
+    }
+
+    function tick() {
+      if (!scanning) return;
+      if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: 'dontInvert' });
+        if (code) {
+          scanning = false;
+          submit(code.data);
+          return;
+        }
+      }
+      requestAnimationFrame(tick);
+    }
+
+    async function submit(payload) {
+      statusBox.className = 'alert alert-info mt-3 text-center';
+      statusBox.textContent = 'Verifying ' + payload + ' …';
+      try {
+        const r = await fetch('{% url "qr_check_in" %}', {
+          method: 'POST',
+          headers: { 'X-CSRFToken': csrf, 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: 'payload=' + encodeURIComponent(payload),
+        });
+        const d = await r.json();
+        if (d.ok && d.duplicate) {
+          showCard('warning', '✓ Already checked in today', d.member);
+        } else if (d.ok) {
+          showCard('success', '✅ Check-in recorded', d.member);
+        } else {
+          showCard('danger', '❌ ' + (d.error || 'Failed'), d.member);
+        }
+      } catch (e) {
+        showCard('danger', 'Network error: ' + e.message, null);
+      }
+      restartBtn.style.display = 'block';
+    }
+
+    function showCard(level, headline, member) {
+      let body = '<h4>' + headline + '</h4>';
+      if (member) {
+        body += '<p class="mb-0"><strong>' + member.name + '</strong>';
+        if (member.plan) body += ' · ' + member.plan;
+        if (member.days_left !== undefined) body += ' · ' + member.days_left + ' days left';
+        if (member.expiry) body += ' · expired ' + member.expiry;
+        body += '</p>';
+      }
+      resultBox.innerHTML = '<div class="alert alert-' + level + '">' + body + '</div>';
+      statusBox.style.display = 'none';
+    }
+
+    restartBtn.addEventListener('click', () => {
+      resultBox.innerHTML = '';
+      statusBox.style.display = 'block';
+      restartBtn.style.display = 'none';
+      scanning = true;
+      requestAnimationFrame(tick);
+    });
+
+    start();
+  </script>
+</body>
+</html>

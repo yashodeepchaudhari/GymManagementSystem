@@ -1,0 +1,68 @@
+{% extends 'trainer/base.html' %}
+{% block title %}{{ member.name }}{% endblock %}
+
+{% block content %}
+<a class="btn btn-link mb-2" href="{% url 'trainer_dashboard' %}">← Back to my members</a>
+
+<div class="row g-3">
+  <div class="col-md-5">
+    <div class="card main-card p-3">
+      <h4 class="mb-1">{{ member.name }}</h4>
+      <p class="text-muted small mb-2">{{ member.email }} · {{ member.contact }}</p>
+      <table class="table table-sm mb-0">
+        <tr><th>Age</th><td>{{ member.age }}</td></tr>
+        <tr><th>Gender</th><td>{{ member.gender }}</td></tr>
+        <tr><th>Height / Weight</th><td>{{ member.height_cm|default:"—" }} cm / {{ member.weight_kg|default:"—" }} kg</td></tr>
+        <tr><th>BMI</th><td>{{ member.bmi|default:"—" }}</td></tr>
+        <tr><th>Goal</th><td>{{ member.get_goal_display|default:"—" }}</td></tr>
+        <tr><th>Experience</th><td>{{ member.get_experience_display|default:"—" }}</td></tr>
+        <tr><th>Diet</th><td>{{ member.get_diet_display|default:"—" }}</td></tr>
+        <tr><th>Plan</th><td>{{ member.plan.name }}</td></tr>
+        <tr><th>Expiry</th><td>{{ member.expiry_date|date:"d M Y" }} ({{ member.days_remaining }}d)</td></tr>
+      </table>
+    </div>
+
+    <div class="card main-card p-3 mt-3">
+      <h5 class="mb-2">Trainer Notes</h5>
+      <form method="POST" action="{% url 'trainer_save_notes' member.id %}">
+        {% csrf_token %}
+        <textarea name="notes" class="form-control" rows="6" placeholder="Form cues, injury notes, week-by-week progression…">{{ assignment.notes }}</textarea>
+        <button class="btn btn-primary mt-2"><i class="bi bi-save"></i> Save Notes</button>
+        <small class="text-muted ms-2">Last updated {{ assignment.updated_at|date:"d M Y, H:i" }}</small>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-md-7">
+    <div class="card main-card p-3">
+      <h5><i class="bi bi-activity"></i> AI Workout</h5>
+      {% if workout %}
+        <p class="small text-muted">{{ workout.content.summary }}</p>
+        <div class="accordion" id="wAcc">
+          {% for d in workout.content.workout %}
+          <div class="accordion-item">
+            <h2 class="accordion-header">
+              <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button"
+                data-bs-toggle="collapse" data-bs-target="#w{{ forloop.counter }}">
+                <strong>{{ d.day }}</strong>&nbsp;·&nbsp;<span class="text-muted">{{ d.focus }}</span>
+              </button>
+            </h2>
+            <div id="w{{ forloop.counter }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" data-bs-parent="#wAcc">
+              <div class="accordion-body p-2">
+                {% if d.exercises %}
+                <table class="table table-sm mb-0"><thead><tr><th>Exercise</th><th>Sets</th><th>Reps</th></tr></thead>
+                <tbody>{% for ex in d.exercises %}<tr><td>{{ ex.name }}</td><td>{{ ex.sets }}</td><td>{{ ex.reps }}</td></tr>{% endfor %}</tbody>
+                </table>
+                {% else %}<em class="text-muted">Rest day</em>{% endif %}
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="text-muted">No AI workout plan generated yet.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

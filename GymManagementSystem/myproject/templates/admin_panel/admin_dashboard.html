@@ -9,6 +9,13 @@
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
       rel="stylesheet"
     />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    {{ chart_labels|json_script:"chart-labels" }}
+    {{ chart_data|json_script:"chart-data" }}
+    {{ forecast_labels|json_script:"fc-labels" }}
+    {{ forecast_history|json_script:"fc-history" }}
+    {{ forecast_predicted|json_script:"fc-predicted" }}
 
     <style>
       /* General Styles */
@@ -70,6 +77,88 @@
   </head>
   <body class="bg-dark text-white">
     {% include "admin_panel/navbar.html" %} {% block content %} {% endblock %}
+
+    <!-- Stats + ML Insights -->
+    <section class="py-4" style="background: #1a1a1a;">
+      <div class="container">
+        <div class="d-flex justify-content-end mb-3">
+          <a href="{% url 'export_members_csv' %}" class="btn btn-outline-warning btn-sm">
+            <i class="bi bi-download"></i> Export Members CSV
+          </a>
+        </div>
+
+        <div class="row g-3 mb-4">
+          <div class="col-md-2"><div class="p-3 rounded" style="background:#222;">
+            <div class="text-warning small">MEMBERS</div>
+            <div style="font-size:2rem;font-weight:700;">{{ member_count }}</div>
+          </div></div>
+          <div class="col-md-2"><div class="p-3 rounded" style="background:#222;">
+            <div class="text-warning small">ACTIVE</div>
+            <div style="font-size:2rem;font-weight:700;color:#80e1a1;">{{ active_member_count }}</div>
+          </div></div>
+          <div class="col-md-2"><div class="p-3 rounded" style="background:#222;">
+            <div class="text-warning small">ENQUIRIES</div>
+            <div style="font-size:2rem;font-weight:700;">{{ enquiry_count }}</div>
+          </div></div>
+          <div class="col-md-2"><div class="p-3 rounded" style="background:#222;">
+            <div class="text-warning small">PLANS</div>
+            <div style="font-size:2rem;font-weight:700;">{{ plan_count }}</div>
+          </div></div>
+          <div class="col-md-2"><div class="p-3 rounded" style="background:#222;">
+            <div class="text-warning small">EQUIPMENT</div>
+            <div style="font-size:2rem;font-weight:700;">{{ equipment_count }}</div>
+          </div></div>
+          <div class="col-md-2"><div class="p-3 rounded" style="background:#222;">
+            <div class="text-warning small">REVENUE (6m)</div>
+            <div style="font-size:1.6rem;font-weight:700;">₹{{ total_revenue|floatformat:0 }}</div>
+          </div></div>
+        </div>
+
+        {% if chart_labels %}
+        <div class="p-3 rounded mb-4" style="background:#222;">
+          <h5 class="text-warning"><i class="bi bi-bar-chart"></i> Monthly Revenue</h5>
+          <canvas id="revenueChart" height="80"></canvas>
+        </div>
+        {% endif %}
+
+        {% if forecast_labels %}
+        <div class="p-3 rounded mb-4" style="background:#222;">
+          <h5 class="text-warning"><i class="bi bi-graph-up-arrow"></i> Signup Forecast (next 3 months)</h5>
+          <p class="text-muted small mb-2">Linear regression with 12-month seasonality on past signups. Solid = actual, dashed = predicted.</p>
+          <canvas id="forecastChart" height="80"></canvas>
+        </div>
+        {% endif %}
+
+        <div class="p-3 rounded" style="background:#222;">
+          <h5 class="text-warning"><i class="bi bi-graph-down-arrow"></i> Churn Risk (ML)</h5>
+          {% if not model_trained %}
+            <p class="text-muted mb-0">No model trained yet. Run <code>python manage.py seed_demo --clear</code> then <code>python manage.py train_churn</code>.</p>
+          {% elif at_risk %}
+            <table class="table table-dark table-sm mb-0">
+              <thead><tr><th>Member</th><th>Plan</th><th>Days Left</th><th>Churn Probability</th></tr></thead>
+              <tbody>
+                {% for m, prob, pct in at_risk %}
+                <tr>
+                  <td>{{ m.name }}</td>
+                  <td>{{ m.plan.name }}</td>
+                  <td>{{ m.days_remaining }}</td>
+                  <td>
+                    <div class="progress" style="height:18px;">
+                      <div class="progress-bar bg-danger" style="width: {{ pct }}%;">
+                        {{ pct }}%
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          {% else %}
+            <p class="text-muted mb-0">No active members currently flagged at risk.</p>
+          {% endif %}
+        </div>
+      </div>
+    </section>
 
     <!-- Hero Section -->
     <section id="hero" class="hero section dark-background">
@@ -144,5 +233,47 @@
       </div>
     </section>
     <!-- /Hero Section -->
+
+    <script>
+      const labels = JSON.parse(document.getElementById('chart-labels').textContent || '[]');
+      const data = JSON.parse(document.getElementById('chart-data').textContent || '[]');
+      if (labels.length) {
+        new Chart(document.getElementById('revenueChart'), {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: [{ label: 'Revenue (₹)', data: data, backgroundColor: '#f8b400' }]
+          },
+          options: {
+            scales: { y: { ticks: { color: '#ddd' }, grid: { color: '#333' } },
+                      x: { ticks: { color: '#ddd' }, grid: { color: '#333' } } },
+            plugins: { legend: { labels: { color: '#fff' } } }
+          }
+        });
+      }
+
+      const fcLabels = JSON.parse(document.getElementById('fc-labels')?.textContent || '[]');
+      const fcHist = JSON.parse(document.getElementById('fc-history')?.textContent || '[]');
+      const fcPred = JSON.parse(document.getElementById('fc-predicted')?.textContent || '[]');
+      if (fcLabels.length) {
+        new Chart(document.getElementById('forecastChart'), {
+          type: 'line',
+          data: {
+            labels: fcLabels,
+            datasets: [
+              { label: 'Actual signups', data: fcHist, borderColor: '#80e1a1', backgroundColor: 'rgba(128,225,161,0.1)',
+                spanGaps: true, tension: 0.25, pointRadius: 4 },
+              { label: 'Predicted', data: fcPred, borderColor: '#f8b400', borderDash: [6, 4],
+                backgroundColor: 'rgba(248,180,0,0.1)', spanGaps: true, tension: 0.25, pointRadius: 4 }
+            ]
+          },
+          options: {
+            scales: { y: { ticks: { color: '#ddd' }, grid: { color: '#333' }, beginAtZero: true },
+                      x: { ticks: { color: '#ddd' }, grid: { color: '#333' } } },
+            plugins: { legend: { labels: { color: '#fff' } } }
+          }
+        });
+      }
+    </script>
   </body>
 </html>

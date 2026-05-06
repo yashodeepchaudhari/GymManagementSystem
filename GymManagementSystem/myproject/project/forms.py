@@ -1,46 +1,74 @@
-# forms.py
 from django import forms
-from .models import Contact,add_Enquiry,add_Plan,add_Equipment,add_Member,Image # Import the model where you want to store the contact form data
+from .models import Contact, Enquiry, Plan, Equipment, Member, Image
 
-class ContactFormModelForm(forms.ModelForm):
+
+def _add_class(widget, klass):
+    """Append a CSS class to a widget without nuking existing attrs."""
+    existing = widget.attrs.get('class', '')
+    widget.attrs['class'] = (existing + ' ' + klass).strip()
+
+
+class _BootstrapMixin:
+    """Auto-apply form-control / form-select to all rendered widgets."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            widget = field.widget
+            if isinstance(widget, (forms.Select, forms.SelectMultiple, forms.NullBooleanSelect)):
+                _add_class(widget, 'form-select')
+            elif isinstance(widget, (forms.CheckboxInput, forms.CheckboxSelectMultiple)):
+                _add_class(widget, 'form-check-input')
+            elif isinstance(widget, (forms.RadioSelect,)):
+                pass
+            elif isinstance(widget, forms.FileInput):
+                _add_class(widget, 'form-control')
+            else:
+                _add_class(widget, 'form-control')
+
+
+class ContactFormModelForm(_BootstrapMixin, forms.ModelForm):
     class Meta:
-        model = Contact  # Replace this with your model if you have a custom one
-        fields = ['name', 'email', 'subject', 'message']  # Include the fields that the form will take input for
+        model = Contact
+        fields = ['name', 'email', 'subject', 'message']
 
 
-
-class EnquiryForm(forms.ModelForm):
+class EnquiryForm(_BootstrapMixin, forms.ModelForm):
     class Meta:
-        model = add_Enquiry
+        model = Enquiry
         fields = ['name', 'contact', 'email', 'age', 'gender']
 
-class PlanForm(forms.ModelForm):
+
+class PlanForm(_BootstrapMixin, forms.ModelForm):
     class Meta:
-        model = add_Plan
-        fields = ['name', 'amount', 'duration']
+        model = Plan
+        fields = ['name', 'amount', 'duration', 'duration_days']
 
 
-class EquipmentForm(forms.ModelForm):
+class EquipmentForm(_BootstrapMixin, forms.ModelForm):
     class Meta:
-        model = add_Equipment
+        model = Equipment
         fields = ['name', 'price', 'unit', 'date', 'description']
         widgets = {
             'date': forms.DateInput(attrs={'type': 'date'}),
         }
 
-class MemberForm(forms.ModelForm):
+
+class MemberForm(_BootstrapMixin, forms.ModelForm):
     class Meta:
-        model = add_Member
-        fields = ['name', 'contact', 'email', 'age', 'gender', 'plan', 'join_date', 'expiry_date', 'amount']
+        model = Member
+        fields = [
+            'name', 'contact', 'email', 'age', 'gender',
+            'plan', 'join_date', 'amount',
+            'height_cm', 'weight_kg', 'goal', 'experience', 'diet',
+        ]
         widgets = {
             'join_date': forms.DateInput(attrs={'type': 'date'}),
-            'expiry_date': forms.DateInput(attrs={'type': 'date'}),
         }
 
-class ImageForm(forms.ModelForm):
- class Meta:
-  model = Image
-  fields = '__all__'
-  labels = {'photo':''}
-    
-       
+
+class ImageForm(_BootstrapMixin, forms.ModelForm):
+    class Meta:
+        model = Image
+        fields = '__all__'
+        labels = {'photo': ''}
