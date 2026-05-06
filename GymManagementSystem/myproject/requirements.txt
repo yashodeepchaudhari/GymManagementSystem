@@ -3,6 +3,11 @@ python-decouple==3.8
 Pillow==11.1.0
 django-cleanup==9.0.0
 
+# REST API (referenced by settings.py)
+djangorestframework==3.15.2
+djangorestframework-simplejwt==5.3.1
+drf-spectacular==0.27.2
+
 # AI integrations
 google-generativeai==0.8.3
 scikit-learn==1.5.2
@@ -14,3 +19,8 @@ django-storages==1.14.4
 boto3==1.35.36
 mysqlclient==2.2.4
 gunicorn==23.0.0
+
+# Production deploy (Render)
+dj-database-url==2.2.0
+psycopg2-binary==2.9.9
+whitenoise==6.7.0
